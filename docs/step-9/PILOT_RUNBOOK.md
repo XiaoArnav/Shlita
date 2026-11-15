@@ -118,12 +118,87 @@ curl -X POST https://gateway.pilot.shlita.xyz/v1/agents \
 
 ## 5. Monitoring & Alerting
 
-```bash
-# 5.1 Health check (every 60 seconds)
-# Configure uptime monitor to poll:
-# GET https://gateway.pilot.shlita.xyz/ready
+### 5.1 Local Alert Rehearsal Drill
+Execute the automated local outage and recovery alert drill against an isolated gateway and local webhook receiver:
 
-# 5.2 Prometheus metrics
+```bash
+node scripts/alert-rehearsal.mjs
+```
+
+**Drill Lifecycle & Verified Scenarios:**
+1. **Healthy Baseline**: Probes `/ready` on the isolated gateway; receiver receives 0 incident alerts while gateway is healthy.
+2. **Brief Interruption**: A transient failure below the configured failure threshold (e.g., 1 failure when threshold is 2) transitions the monitor to `DEGRADED` without firing premature alerts.
+3. **Sustained Outage**: The gateway process is stopped. Upon reaching the threshold (2 consecutive failures), the monitor dispatches exactly **one** `gateway_outage` notification to the webhook receiver. Repeated failures while the outage persists are suppressed (0 duplicate notifications).
+4. **Recovery Notification**: The gateway process is restored. Upon returning to HTTP 200 `ready`, the monitor dispatches exactly **one** `gateway_recovered` notification referencing the matching `incidentId`.
+5. **Delivery Failure Handling**: When the webhook sink returns non-2xx (e.g., HTTP 500) or times out, the monitor executes bounded retries (3 total attempts) with backoff and reports delivery failure without crashing.
+6. **Graceful Cleanup**: All child processes, sockets, and temporary database files are purged.
+
+### 5.2 Standalone Readiness Monitor Daemon
+The standalone monitor (`scripts/readiness-monitor.mjs`) runs independently of the gateway process, using standard `fetch` with strict TLS verification for HTTPS targets.
+
+**CLI Invocation:**
+```bash
+node scripts/readiness-monitor.mjs \
+  --target-url https://gateway.pilot.shlita.xyz \
+  --webhook-url https://alerts.internal.example/webhooks/shlita \
+  --interval-ms 10000 \
+  --failure-threshold 3
+```
+
+**Configuration Reference:**
+
+| Parameter | Environment Variable | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--target-url` | `SHLITA_GATEWAY_URL` / `STAGING_GATEWAY_URL` | `http://127.0.0.1:4000` | Gateway base URL (monitors `/ready`). |
+| `--webhook-url` | `SHLITA_ALERT_WEBHOOK_URL` | `null` | Alert destination URL (e.g. Slack/PagerDuty webhook). |
+| `--interval-ms` | `SHLITA_MONITOR_INTERVAL_MS` | `5000` | Polling frequency in milliseconds (rehearsal: `100ms`). |
+| `--failure-threshold` | `SHLITA_MONITOR_FAILURE_THRESHOLD` | `3` | Consecutive failed probes required to trigger outage alert. |
+| `--recovery-threshold` | `SHLITA_MONITOR_RECOVERY_THRESHOLD` | `1` | Consecutive successful probes required to trigger recovery alert. |
+| `--probe-timeout-ms` | `SHLITA_PROBE_TIMEOUT_MS` | `2500` | HTTP request deadline per `/ready` probe. |
+
+### 5.3 Event Payloads & Recognition
+
+**Outage Notification (`gateway_outage`):**
+```json
+{
+  "event": "gateway_outage",
+  "gatewayId": "gateway.pilot.shlita.xyz",
+  "timestamp": "2026-11-15T16:14:15.644Z",
+  "incidentId": "inc_1794759255644",
+  "details": {
+    "consecutiveFailures": 3,
+    "failureThreshold": 3,
+    "lastError": "HTTP 503: Service Unavailable"
+  }
+}
+```
+
+**Recovery Notification (`gateway_recovered`):**
+```json
+{
+  "event": "gateway_recovered",
+  "gatewayId": "gateway.pilot.shlita.xyz",
+  "timestamp": "2026-11-15T16:14:25.960Z",
+  "incidentId": "inc_1794759255644",
+  "details": {
+    "downtimeSeconds": 10.3,
+    "lastProbeDurationMs": 1.2
+  }
+}
+```
+
+### 5.4 Applying to Staging Gateway (`LIVE-ALERT-01`)
+To execute the live staging alert check once the cloud host and webhook sink are provisioned:
+1. Export `SHLITA_ALERT_WEBHOOK_URL="https://hooks.slack.com/services/..."`.
+2. Start the monitor targeting `https://gateway.staging.shlita.xyz`.
+3. Induce a controlled outage: `docker compose -f compose.staging.yaml stop gateway`.
+4. Verify receipt of `gateway_outage` in the webhook channel.
+5. Restore the gateway: `docker compose -f compose.staging.yaml start gateway`.
+6. Verify receipt of `gateway_recovered` in the webhook channel.
+
+### 5.5 Prometheus Metrics & Logs
+
+```bash
 # Scrape endpoint: GET https://gateway.pilot.shlita.xyz/metrics
 # Key metrics:
 #   shlita_operations_total — total operation count
@@ -131,7 +206,6 @@ curl -X POST https://gateway.pilot.shlita.xyz/v1/agents \
 #   shlita_operations_rejected — policy rejections
 #   shlita_circuit_breaker_trips — circuit breaker activations
 
-# 5.3 Log monitoring
 # Tail structured JSON logs from Docker:
 docker logs -f shlita-gateway --since 1h | jq .
 ```
@@ -235,6 +309,7 @@ If a critical issue is discovered during the pilot:
 
 ## 11. Staging & Pilot Status
 
-- **Step 16 Local Rehearsal**: Verified. Packaged SDK, external install, all 6 developer/operator scenarios pass with persistent SQLite storage and zero secret leaks.
-- **Step 12 Hosted Staging**: Tracked in PR #19 pending approval of an accessible Linux host (`gateway.staging.shlita.xyz`).
+- **Step 17 Local Alert Rehearsal**: Verified. Standalone readiness monitor (`scripts/readiness-monitor.mjs`), automated drill (`scripts/alert-rehearsal.mjs`), healthy baseline, brief interruption suppression, single outage event delivery, duplicate suppression, single recovery event delivery, bounded webhook retry on failure, and clean process teardown verified locally.
+- **Step 16 Local Pilot Rehearsal**: Verified. Packaged SDK, external install, all 6 developer/operator scenarios pass with persistent SQLite storage and zero secret leaks.
+- **Step 12 Hosted Staging**: Tracked in PR #19 pending approval of an accessible Linux host (`gateway.staging.shlita.xyz`) and webhook secret (`SHLITA_ALERT_WEBHOOK_URL`) for live cloud execution of `LIVE-ALERT-01`.
 - **Step 15 Live Gemini Smoke Test**: Verified deterministically; live smoke test is tracked separately pending external `GEMINI_API_KEY`.

@@ -341,7 +341,8 @@ Hold Step 13 until cloud VM, DNS record, and staging secrets are supplied.
      docker compose -f compose.staging.yaml start gateway
      # 4. Confirm recovery notification received at $SHLITA_ALERT_WEBHOOK_URL
      ```
-   - **Status:** ⚠️ **BLOCKED** on `BLOCKER-SECRET-01` and `BLOCKER-HOST-01`.
+   - **Local Rehearsal Evidence (Step 17):** Verified locally in `scripts/alert-rehearsal.mjs` and `tests/step-17/readiness-alert.test.ts` (healthy baseline, brief interruption suppression, single outage event delivery, duplicate suppression, single recovery event delivery, bounded webhook retry on failure, and clean process teardown).
+   - **Status:** ⚠️ **BLOCKED on Staging** on `BLOCKER-SECRET-01` and `BLOCKER-HOST-01`.
 
 4. **Host Scheduled Backup Restore (LIVE-RESTORE-01):**
    - **Evaluation:** Verifies that a scheduled snapshot produced on the host restores cleanly.
