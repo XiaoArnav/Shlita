@@ -351,25 +351,67 @@ If rollback exits non-zero on `[1/4] Pulling target image...`:
 
 ### 10.2 Database Disaster Recovery (Ledger State Restore)
 
-If database corruption or catastrophic operator error occurs:
+If database corruption or catastrophic operator error occurs, restore the ledger from a verified automated backup snapshot using the restore CLI (`dist/packages/gateway/src/restore-cli.js`).
 
-1. **Freeze all agents** immediately via operator API or dashboard.
+#### Canonical Restore Command:
+```bash
+# Direct node execution:
+node dist/packages/gateway/src/restore-cli.js /var/backups/shlita-external/<snapshot-file>.db /var/lib/shlita/ledger.db
+
+# Or container execution via Docker:
+docker run --rm \
+  -v shlita-staging-external-backups:/var/backups/shlita-external:ro \
+  -v shlita-staging-data:/var/lib/shlita \
+  -u 10001:10001 \
+  ghcr.io/xiaoarnav/shlita:staging \
+  node dist/packages/gateway/src/restore-cli.js /var/backups/shlita-external/<snapshot-file>.db /var/lib/shlita/ledger.db
+```
+
+#### Step-by-Step Restoration Procedure:
+1. **Freeze all agents** immediately via operator API or dashboard to halt new inbound write requests.
 2. **Create emergency copy** of the current database file for forensic audit:
    ```bash
-   cp /var/lib/shlita/ledger.db /var/lib/shlita/ledger-corrupt-$(date +%Y%m%d%H%M%S).db
+   cp /var/lib/shlita/ledger.db /var/lib/shlita/ledger-incident-$(date +%Y%m%d%H%M%S).db
    ```
-3. **Stop the gateway** container (`docker compose stop gateway`).
-4. **Restore from verified snapshot** using restore CLI:
+3. **Stop the gateway service** container to release all database write locks:
    ```bash
-   node dist/packages/gateway/src/restore-cli.js /var/backups/shlita-external/<snapshot-file>.db /var/lib/shlita/ledger.db
+   docker compose -f compose.staging.yaml stop gateway
    ```
-5. **Restart the gateway** (`docker compose up -d gateway`) and verify `/ready` returns HTTP 200.
-6. **Notify partners** of the incident and resolution.
+4. **Select Target Snapshot**:
+   - List available snapshots in descending timestamp order:
+     ```bash
+     ls -1t /var/backups/shlita-external/ledger-*.db | head -n 5
+     ```
+   - Identify the snapshot produced immediately prior to the incident timestamp.
+5. **Execute Restore**:
+   - By default, `restore-cli.js` refuses to overwrite an existing destination ledger to prevent accidental data loss.
+   - To overwrite the incident database, export `SHLITA_RESTORE_OVERWRITE=true`:
+     ```bash
+     SHLITA_RESTORE_OVERWRITE=true node dist/packages/gateway/src/restore-cli.js \
+       /var/backups/shlita-external/<chosen-snapshot>.db /var/lib/shlita/ledger.db
+     ```
+6. **Integrity & Continuity Verification**:
+   - The restore CLI automatically performs `PRAGMA integrity_check` on the backup file before copying and sets file mode `0600`.
+   - Start the gateway service:
+     ```bash
+     docker compose -f compose.staging.yaml up -d gateway
+     ```
+   - Poll `/ready` until HTTP 200 is confirmed:
+     ```bash
+     curl -sf http://127.0.0.1:4000/ready
+     ```
+   - Verify ledger operations and summary via operator API:
+     ```bash
+     curl -s http://127.0.0.1:4000/v1/operations \
+       -H "x-shlita-operator-key: $SHLITA_OPERATOR_KEY" | jq '.operations[0]'
+     ```
+7. **Cleanup**: Remove temporary incident copies after post-mortem investigation completes.
 
 ---
 
 ## 11. Staging & Pilot Status
 
+- **Step 19 Scheduled Backup and Recovery Drill**: Verified. Automated drill (`scripts/verify-compose-recovery.sh`), scheduler loop execution (`SHLITA_BACKUP_INTERVAL_SECONDS=3`), snapshot metadata & SHA-256 integrity, independent restore into fresh volume via `restore-cli.js`, fresh gateway startup & `/ready` HTTP 200, ledger continuity (`ACCOUNTING_COMMITTED`, matching amounts and settlement fields), source database preservation, and clean teardown verified locally and in CI.
 - **Step 18 Local Rollback and Recovery Drill**: Verified. Standalone rollback script (`scripts/rollback.sh`), automated compose drill (`scripts/verify-compose-rollback.sh`), failure-before-stopping invariant on unavailable image, gateway image downgrade, ledger volume persistence, SQLite `PRAGMA integrity_check: ok`, financial operation survival (`ACCOUNTING_COMMITTED`), and worker coexistence verified locally and in CI.
 - **Step 17 Local Alert Rehearsal**: Verified. Standalone readiness monitor (`scripts/readiness-monitor.mjs`), automated drill (`scripts/alert-rehearsal.mjs`), healthy baseline, brief interruption suppression, single outage event delivery, duplicate suppression, single recovery event delivery, bounded webhook retry on failure, and clean process teardown verified locally.
 - **Step 16 Local Pilot Rehearsal**: Verified. Packaged SDK, external install, all 6 developer/operator scenarios pass with persistent SQLite storage and zero secret leaks.
