@@ -1,118 +1,227 @@
-# Shlita developer quickstart
+# Shlita Developer Quickstart & Pilot Integration Guide
 
-Shlita is a gateway in front of paid provider calls. An agent presents its API key. The gateway checks the agent's policy, reserves the server tariff, and either dispatches the call or records a rejection. The ledger is the record of that decision.
+Shlita is a spending policy gateway for autonomous AI agents. An agent presents its scoped API key. The gateway evaluates policies, reserves the server tariff in an SQLite WAL ledger, and either dispatches the call to an approved provider or halts at the perimeter with a rejection.
 
-Shlita does not host a public API. It does not hold your provider secret in the SDK. It does not move USDC because a proxy call returned 200. A committed proxy row has `fundsMoved: false` and `settlement.status: NOT_SUBMITTED` until a separate confirmed settlement exists. Estimated holds are not vendor invoices.
+Shlita does not require a public API. It does not hold downstream provider secrets inside the client SDK. It does not move USDC on Solana simply because a proxy call returned HTTP 200. Every committed proxy row has `fundsMoved: false` and `settlement.status: "NOT_SUBMITTED"` until an operator executes on-chain settlement. Estimated holds are not vendor invoices.
 
-## Run a gateway
+---
 
-Node.js 22 or newer.
+## 1. Gateway Setup (Local Development)
 
+Node.js 22 or newer is required.
+
+### Clean Checkout & Build
 ```bash
 npm ci
 npm run build
+```
+
+### Start the Gateway
+```bash
+# Set credentials and enable local development simulation
+export SHLITA_ENV=development
+export SHLITA_OPERATOR_KEY="111111111111111111111111111111111111111111111111" # 32+ hex characters
+export SHLITA_OPERATOR_ORG="org-local-pilot"
+export SHLITA_ALLOW_SIMULATION=true
+export PORT=4000 # Optional; defaults to 4000
+
 npm start
 ```
 
-Open `http://127.0.0.1:4000`. Development can create an operator key under `.shlita/` and does not print it. Set `SHLITA_OPERATOR_KEY` yourself when you want a known credential. `SHLITA_ALLOW_SIMULATION=true` is a development switch. Production rejects simulation, demo enrollment, and an in-memory database.
-
-Docker is the same process with a volume:
-
+Gateway health check:
 ```bash
-docker build -t shlita:local .
-docker compose up
+curl -s http://127.0.0.1:4000/ready
+# Expected: {"status":"ok"}
 ```
 
-`compose.yaml` maps port 4010 and stores the ledger on the `shlita-data` volume. One container is the supported deployment. A second writer is not.
+> **Note on Staging & Production**: Production rejects simulation (`SHLITA_ALLOW_SIMULATION=true`), demo enrollment (`SHLITA_SEED_DEMO=true`), and in-memory databases (`:memory:`). Hosted staging is tracked separately under Step 12.
 
-## Enroll an agent
+---
 
-From a trusted backend, with `ShlitaOperatorClient` or `POST /v1/agents` and `x-shlita-operator-key`:
+## 2. Pack and Install the SDK
 
-- `agentId`: 3–80 characters from letters, numbers, `.`, `_`, `~`, `-`
-- `allowedVendors`: provider hosts, such as `api.helius.xyz`
-- `maxPerCallMicroUsdc` and `periodBudgetMicroUsdc`: positive integer strings
+`shlita-sdk` is distributed as a self-contained tarball generated from the repository.
 
-The response includes `apiKey` once. Store it outside the browser. The operator key stays on the backend. The dashboard session cookie is HttpOnly and is not an SDK credential.
-
-## Install the SDK
-
-`shlita-sdk` is not on the npm registry. From this repository:
-
+### Pack the SDK Archive (from Shlita repository root)
 ```bash
+# 1. Build the SDK TypeScript bundle
 npm run build:sdk
-cd packages/sdk
-npm pack --pack-destination /tmp/shlita-sdk
+
+# 2. Ensure destination directory exists and pack
+mkdir -p /tmp/shlita-sdk
+npm pack --pack-destination /tmp/shlita-sdk ./packages/sdk
+# Outputs: /tmp/shlita-sdk/shlita-sdk-0.1.0.tgz
 ```
 
-In the other project:
+The packaged archive contains `dist/*.js`, `dist/*.d.ts`, `README.md`, and `package.json`. It contains zero raw `.ts` source files, zero gateway files, and zero private credentials.
 
+### Install in an External Project
 ```bash
+mkdir my-agent && cd my-agent
+npm init -y
+npm pkg set type="module"
 npm install /tmp/shlita-sdk/shlita-sdk-0.1.0.tgz
 ```
 
-The archive contains `dist/*.js`, `dist/*.d.ts`, `README.md`, and `package.json`. It does not contain the gateway, the ledger, or TypeScript implementation source.
+Verify that the package imports cleanly via public exports:
+```typescript
+import { ShlitaAgentClient, ShlitaOperatorClient } from 'shlita-sdk';
+```
 
-## First call
+---
 
+## 3. Operator Flow: Enroll an Agent
+
+Run this on a trusted operator/backend environment to issue disposable credentials:
+
+```typescript
+import { ShlitaOperatorClient } from 'shlita-sdk';
+
+const operator = new ShlitaOperatorClient({
+  operatorKey: process.env.SHLITA_OPERATOR_KEY!,
+  baseUrl: process.env.SHLITA_GATEWAY_URL || 'http://127.0.0.1:4000',
+});
+
+const issued = await operator.enrollAgent({
+  agentId: 'pilot-agent-alpha',
+  allowedVendors: ['api.helius.xyz'],
+  maxPerCallMicroUsdc: '50000',      // $0.05 USDC per call
+  periodBudgetMicroUsdc: '1000000',  // $1.00 USDC period limit
+});
+
+console.log('Enrolled Agent:', issued.agentId);
+console.log('Agent API Key :', issued.apiKey); // Store securely; shown only once
+```
+
+---
+
+## 4. Developer Flow: Making Calls
+
+The agent application uses `ShlitaAgentClient` with the scoped agent API key.
+
+### Scenario A: Permitted Request (Approved & Committed)
 ```typescript
 import { ShlitaAgentClient } from 'shlita-sdk';
 
-const shlita = new ShlitaAgentClient({
+const agent = new ShlitaAgentClient({
   apiKey: process.env.SHLITA_API_KEY!,
-  baseUrl: process.env.SHLITA_GATEWAY_URL!,
+  baseUrl: process.env.SHLITA_GATEWAY_URL || 'http://127.0.0.1:4000',
 });
 
-const result = await shlita.proxy({
-  agentId: 'research-agent',
+const result = await agent.proxy({
+  agentId: 'pilot-agent-alpha',
   vendor: 'api.helius.xyz',
-  method: 'POST',
   path: '/v0/token-metadata',
-  body: { mints: ['example-mint'] },
-  idempotencyKey: 'operation-unique-id',
+  method: 'POST',
+  body: { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' },
+  idempotencyKey: 'rehearsal-key-001', // At least 8 characters
+  simulate: true, // Requires SHLITA_ALLOW_SIMULATION=true on local gateway
 });
+
+if (result.outcome === 'committed') {
+  console.log('Operation ID:', result.operationId);
+  console.log('Reserved µUSDC:', result.cost.reservedAmountMicroUsdc); // "10000" ($0.0100 USDC)
+  console.log('Settlement Status:', result.settlement.status);          // "NOT_SUBMITTED"
+  console.log('Funds Moved:', result.fundsMoved);                      // false
+  console.log('Provider Data:', result.upstream);
+}
 ```
 
-`simulate: true` is for a gateway started with `SHLITA_ALLOW_SIMULATION=true`. Production returns 403 `SIMULATION_DISABLED`.
+### Scenario B: Policy Rejection (Perimeter Block)
+If the agent calls an unapproved vendor or exceeds its per-call or budget limits:
+```typescript
+const denied = await agent.proxy({
+  agentId: 'pilot-agent-alpha',
+  vendor: 'api.tavily.com', // NOT in allowedVendors
+  path: '/search',
+  method: 'POST',
+  body: { query: 'solana ecosystem' },
+  idempotencyKey: 'rehearsal-key-denied',
+  simulate: true,
+});
 
-Read `result.outcome`:
+if (denied.outcome === 'rejected') {
+  console.log('Decision:', denied.decision); // "BLOCKED"
+  console.log('Reason  :', denied.reason);   // "UNAPPROVED_VENDOR"
+  // Zero downstream requests were dispatched; zero micro-USDC reserved.
+}
+```
 
-- `committed`: the server tariff was reserved. `cost.reservedAmountMicroUsdc` is that tariff. `cost.actualCostMicroUsdc` is null. `fundsMoved` is false.
-- `rejected`: policy, authentication, or simulation stopped the call. `reason` names the rule, such as `UNAPPROVED_VENDOR`, `PER_CALL_LIMIT_EXCEEDED`, or `AGENT_FROZEN`.
-- `conflict`: the idempotency key was reused for a different payload (`IDEMPOTENCY_CONFLICT`) or the first call is still in progress (`OPERATION_IN_PROGRESS`).
-- `uncertain`: the gateway answered 504 or marked the operation for reconciliation. The provider might have run. Do not send a new key.
+### Scenario C: Idempotent Replay
+Replaying the same `idempotencyKey` and payload returns the original stored result:
+```typescript
+const replay = await agent.proxy({
+  agentId: 'pilot-agent-alpha',
+  vendor: 'api.helius.xyz',
+  path: '/v0/token-metadata',
+  method: 'POST',
+  body: { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' },
+  idempotencyKey: 'rehearsal-key-001', // Same key as Scenario A
+  simulate: true,
+});
 
-A thrown `ShlitaUncertainError` means the SDK sent the request once and received no usable response (`TIMEOUT`, `NETWORK`, or `CANCELLED`). That is not a definite provider failure. Call `proxy` again with the same key and the same payload when you want the gateway to return the stored result. The SDK does not do that by itself.
+console.log('Replay Flag:', replay.outcome === 'committed' && replay.replay); // true
+console.log('Operation ID:', replay.operationId); // Identical to original op ID
+```
 
-## Policies, freeze, and operations
+---
 
-`ShlitaOperatorClient` sends `x-shlita-operator-key`. It is the administration client: enroll, list, freeze, unfreeze, reset the circuit, read operations, the dashboard, audit, and reconciliation. An agent key cannot construct those calls. Caller-supplied `authorization`, cookie, agent key, and operator key headers are removed before the SDK sets its own credential.
+## 5. Operator Inspection & Emergency Controls
 
-Amounts are micro-USDC strings. `10000` is `0.010000` USDC. The Helius server tariff used by the gateway is `10000` micro-USDC. A caller estimate does not raise that reservation.
+### Inspecting Operations in the Ledger
+```typescript
+const { operations } = await operator.listOperations();
+const record = operations.find((op) => op.operationId === result.operationId);
 
-`examples/basic-agent`, `examples/policy`, `examples/idempotency`, and `examples/tool-adapter` are the runnable versions of these cases. The tool adapter is a small function schema with an `execute` method. It is not a framework integration.
+console.log('Ledger State    :', record.state);                   // "ACCOUNTING_COMMITTED"
+console.log('Reserved Tariff :', record.reservedAmountMicroUsdc); // "10000"
+console.log('Settlement      :', record.settlementStatus);        // "NOT_SUBMITTED"
+console.log('Signature       :', record.signature);               // null (unsettled hold)
+```
 
-## Settlement
+### Emergency Freeze
+Halt all spending for an agent immediately:
+```typescript
+await operator.freezeAgent('pilot-agent-alpha', 'Operator emergency audit');
 
-A proxy success is an estimated hold. Chain settlement is a separate operator request, `POST /v1/operations/{operationId}/settle`. The current gateway records a claim and does not broadcast a transaction. `signature` stays null. Mainnet stays off unless the gateway process is explicitly configured with both `SHLITA_ALLOW_MAINNET=true` and `SOLANA_NETWORK=mainnet-beta`.
+// Subsequent calls by this agent are blocked immediately:
+const postFreeze = await agent.proxy({
+  agentId: 'pilot-agent-alpha',
+  vendor: 'api.helius.xyz',
+  path: '/v0/token-metadata',
+  idempotencyKey: 'rehearsal-key-post-freeze',
+  simulate: true,
+});
 
-## Errors
+console.log(postFreeze.outcome); // "rejected"
+console.log(postFreeze.reason);  // "AGENT_FROZEN"
+```
 
-| What you see | What it means |
-| --- | --- |
-| `A gateway URL is required` | `baseUrl` was missing or not `http`/`https`. |
-| `An API key is required` or `An operator key is required` | The credential was empty or outside the accepted character set. |
-| `A billable request requires an idempotency key` | The key was missing or shorter than 8 characters. |
-| HTTP 401 | The credential was absent. |
-| HTTP 403 | The credential, organization, origin, or policy rejected the call. |
-| HTTP 409 | Same key, different request, or the first request is still open. |
-| HTTP 429 | The login or operator mutation limit was hit. |
-| HTTP 504 or `ShlitaUncertainError` | Outcome unknown. Reuse the key. Do not invent a new one. |
+### Restart & Persistence Guarantee
+When the gateway process is restarted with the same SQLite database file:
+- All committed operations remain visible with `state: "ACCOUNTING_COMMITTED"`.
+- Agent freeze status remains active (`status: "AGENT_FROZEN"`).
+- In-flight or expired operations are safely recovered during bootstrap.
 
-## Limits
+---
 
-- One gateway process and one SQLite file. Sessions live in that process, so a restart asks the operator to sign in again. Login lockouts and ledger rows remain.
-- No public hosted gateway has been verified. Vercel and GitHub Pages serve the static interface only.
-- Mainnet payments are off by default.
-- A simulated or estimated provider response is not a USDC settlement and is not the vendor's invoice.
-- Uncertain operations stay visible on `GET /v1/reconciliation` for an authorized operator.
+## 6. Common Setup Errors & Troubleshooting
+
+| Error / Symptom | Root Cause | Fix |
+| :--- | :--- | :--- |
+| `SHLITA_OPERATOR_ORG is required when SHLITA_OPERATOR_KEY is set.` | When providing `SHLITA_OPERATOR_KEY` in development, `SHLITA_OPERATOR_ORG` was omitted. | Export `SHLITA_OPERATOR_ORG="org-pilot"`. |
+| `Budgets must be positive integer micro-USDC strings.` | Numeric integers or floats were passed in enrollment (e.g. `10000` or `"10.5"`). | Pass positive integer strings: `maxPerCallMicroUsdc: "50000"`. |
+| `Simulation cannot be enabled in production.` | `NODE_ENV=production` or `SHLITA_ENV=production` was set alongside `SHLITA_ALLOW_SIMULATION=true`. | Set `SHLITA_ENV=development` for local testing. |
+| HTTP 403 `SIMULATION_DISABLED` | Client passed `simulate: true`, but gateway was started with `SHLITA_ALLOW_SIMULATION=false`. | Start gateway with `export SHLITA_ALLOW_SIMULATION=true`. |
+| `At least one allowed provider host is required.` | `allowedVendors` in `enrollAgent` was empty or missing. | Provide at least one valid host string, e.g. `['api.helius.xyz']`. |
+| `A billable request requires an idempotency key` | `idempotencyKey` was omitted or shorter than 8 characters. | Provide an idempotency key with `>= 8` characters. |
+| HTTP 409 `IDEMPOTENCY_CONFLICT` | An existing idempotency key was reused with a different request payload. | Use a fresh idempotency key for distinct calls, or preserve identical payload for replaying. |
+| `ENOENT: no such file or directory, open '/tmp/shlita-sdk/...'` | Destination directory does not exist prior to `npm pack`. | Run `mkdir -p /tmp/shlita-sdk` before running `npm pack`. |
+
+---
+
+## 7. Pilot Readiness & Pending Verification
+
+- **Local Pilot Rehearsal (Step 16)**: `VERIFIED`. Packaged SDK installs outside the monorepo, executes permitted calls, blocks unapproved calls, replays idempotency keys, records holds in WAL storage, and survives gateway restarts.
+- **Hosted Staging Deployment (Step 12)**: Tracked separately in PR #19 pending approval of an accessible Linux staging host.
+- **Live Google Gemini Smoke Test (Step 15)**: Verified deterministically; live smoke test is tracked separately and requires external `GEMINI_API_KEY`.
