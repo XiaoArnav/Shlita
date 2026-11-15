@@ -3,6 +3,13 @@ import path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { describe, it, expect } from 'vitest';
+import {
+  ShlitaAgentClient,
+  ShlitaOperatorClient,
+  ShlitaApiError,
+  ShlitaClientError,
+  ShlitaUncertainError,
+} from '../../packages/sdk/src/index.js';
 
 const execAsync = promisify(exec);
 
@@ -23,8 +30,11 @@ describe('Step 21 — Internal Release Rehearsal and Pilot Handoff', () => {
       expect(sdkPkg.files).toEqual(['dist', 'README.md']);
     });
 
-    it('builds SDK TypeScript bundle with all required distribution artifacts', () => {
+    it('builds SDK TypeScript bundle with all required distribution artifacts', async () => {
       const distDir = path.resolve('packages/sdk/dist');
+      if (!fs.existsSync(path.join(distDir, 'index.js'))) {
+        await execAsync('npm run build:sdk');
+      }
       expect(fs.existsSync(path.join(distDir, 'index.js'))).toBe(true);
       expect(fs.existsSync(path.join(distDir, 'index.d.ts'))).toBe(true);
       expect(fs.existsSync(path.join(distDir, 'client.js'))).toBe(true);
@@ -35,13 +45,12 @@ describe('Step 21 — Internal Release Rehearsal and Pilot Handoff', () => {
       expect(fs.existsSync(path.join(distDir, 'types.d.ts'))).toBe(true);
     });
 
-    it('exports all public client and error classes from index.js', async () => {
-      const sdkIndex = await import('../../packages/sdk/dist/index.js');
-      expect(typeof sdkIndex.ShlitaAgentClient).toBe('function');
-      expect(typeof sdkIndex.ShlitaOperatorClient).toBe('function');
-      expect(typeof sdkIndex.ShlitaApiError).toBe('function');
-      expect(typeof sdkIndex.ShlitaClientError).toBe('function');
-      expect(typeof sdkIndex.ShlitaUncertainError).toBe('function');
+    it('exports all public client and error classes from index', () => {
+      expect(typeof ShlitaAgentClient).toBe('function');
+      expect(typeof ShlitaOperatorClient).toBe('function');
+      expect(typeof ShlitaApiError).toBe('function');
+      expect(typeof ShlitaClientError).toBe('function');
+      expect(typeof ShlitaUncertainError).toBe('function');
     });
   });
 
