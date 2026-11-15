@@ -1,7 +1,7 @@
 #!/bin/sh
 # Shlita Staging Rollback Script
 # Usage: ./scripts/rollback.sh <PREVIOUS_IMAGE_TAG_OR_DIGEST>
-# Example: ./scripts/rollback.sh ghcr.io/xiaoarnav/shlita-gateway:158e062
+# Example: ./scripts/rollback.sh ghcr.io/xiaoarnav/shlita:bc7f2d2f8563d1d15329038d68ce872c48f454d0
 
 set -eu
 

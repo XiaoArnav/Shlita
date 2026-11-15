@@ -1,6 +1,6 @@
 services:
   gateway:
-    image: ${SHLITA_IMAGE:-ghcr.io/xiaoarnav/shlita-gateway:staging}
+    image: ${SHLITA_IMAGE:-ghcr.io/xiaoarnav/shlita:staging}
     container_name: ${SHLITA_GATEWAY_CONTAINER:-shlita-staging-gateway}
     restart: unless-stopped
     ports:
@@ -54,7 +54,7 @@ services:
         condition: service_healthy
 
   backup-worker:
-    image: ${SHLITA_IMAGE:-ghcr.io/xiaoarnav/shlita-gateway:staging}
+    image: ${SHLITA_IMAGE:-ghcr.io/xiaoarnav/shlita:staging}
     container_name: ${SHLITA_BACKUP_CONTAINER:-shlita-staging-backup-worker}
     restart: unless-stopped
     command:
