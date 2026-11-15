@@ -352,7 +352,8 @@ Hold Step 13 until cloud VM, DNS record, and staging secrets are supplied.
      node dist/packages/gateway/src/restore-cli.js "$LATEST_SNAPSHOT" /tmp/host-restored-verify.db
      # Verify PRAGMA integrity_check == ok and verify recorded operations
      ```
-   - **Status:** ⚠️ **BLOCKED** on `BLOCKER-HOST-01`.
+   - **Local & CI Rehearsal Evidence (Step 19):** Verified in `scripts/verify-compose-recovery.sh` and `tests/step-19/scheduled.backup.recovery.test.ts` (scheduler execution with interval injection, snapshot metadata & SHA-256 integrity, independent restore into fresh volume via `restore-cli.js`, fresh gateway startup & `/ready` HTTP 200, ledger continuity with matching amounts and settlement fields, source database preservation, and clean teardown).
+   - **Status:** ⚠️ **BLOCKED on Staging** on `BLOCKER-HOST-01`.
 
 ### Immediate Deployment Once Host is Provisioned:
 ```bash

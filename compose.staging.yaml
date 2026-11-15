@@ -108,8 +108,10 @@ services:
     environment:
       SHLITA_DB_PATH: /var/lib/shlita/ledger.db
       SHLITA_BACKUP_DIR: /var/backups/shlita-external
-      SHLITA_BACKUP_RETENTION: "14"
-      SHLITA_BACKUP_INTERVAL_SECONDS: "86400"
+      SHLITA_BACKUP_RETENTION: ${SHLITA_BACKUP_RETENTION:-14}
+      SHLITA_BACKUP_INTERVAL_SECONDS: ${SHLITA_BACKUP_INTERVAL_SECONDS:-86400}
+      SHLITA_BACKUP_RUN_ON_STARTUP: ${SHLITA_BACKUP_RUN_ON_STARTUP:-false}
+      SHLITA_BACKUP_ONCE: ${SHLITA_BACKUP_ONCE:-false}
     volumes:
       - shlita-data:/var/lib/shlita
       - shlita-external-backups:/var/backups/shlita-external

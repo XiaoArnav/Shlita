@@ -170,6 +170,11 @@ jobs:
           export SHLITA_IMAGE="shlita:step5"
           bash -x scripts/verify-compose-rollback.sh
 
+      - name: Verify Compose scheduled backup and gateway recovery
+        run: |
+          export SHLITA_IMAGE="shlita:step5"
+          bash -x scripts/verify-compose-recovery.sh
+
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
