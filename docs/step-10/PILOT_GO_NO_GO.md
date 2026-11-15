@@ -56,6 +56,16 @@ flowchart LR
 4. **Deploy Telemetry Forwarder:** Configure Promtail, Vector, or Docker syslog to stream container logs to an off-host monitoring sink with alerts on error rate spikes.
 5. **Issue Sandboxed Partner Credentials:** Distribute SDK tarball (`shlita-sdk-0.1.0.tgz`) and scoped agent keys with bounded budgets (e.g. 100,000 µUSDC).
 
+#### Step 20 Assessment & Current Status:
+- **Condition 1 (Staging VM):** ❌ **UNMET (`BLOCKER-HOST-01`)** — Cloud VM remains unprovisioned.
+- **Condition 2 (Public DNS & TLS):** ❌ **UNMET (`BLOCKER-DNS-01`)** — `gateway.staging.shlita.xyz` returns `NXDOMAIN`.
+- **Condition 3 (Single-Instance Constraint):** ✅ **READY** — Verified in `compose.staging.yaml` and Step 18 rollback drill.
+- **Condition 4 (Telemetry & SRE Alerts):** ⚠️ **PARTIAL (`BLOCKER-SECRET-01`)** — Monitoring probe and flap damping verified in Step 17 rehearsal; live webhook destination unconfigured.
+- **Condition 5 (Partner Onboarding & SDK):** ✅ **READY** — Verified in Step 16 local pilot rehearsal (`shlita-sdk-0.1.0.tgz` installation and policy rejection).
+- **Live Gemini Smoke Test (Step 15):** ⏸️ **DEFERRED** — Deterministic fixture verified; live test deferred pending `GEMINI_API_KEY`.
+
+**Overall Step 20 Pilot Recommendation:** **NO-GO for immediate live external traffic / CONDITIONAL GO pending host provisioning and DNS delegation**. Maintainer action on `BLOCKER-HOST-01`, `BLOCKER-DNS-01`, and `BLOCKER-SECRET-01` is required before onboarding external partners.
+
 ---
 
 ## 4. Tier C — Paid Commercial Pilot
