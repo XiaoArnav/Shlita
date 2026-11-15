@@ -76,7 +76,7 @@ A rigorous analysis of repository records separates CI artifact publication from
 | **3. Edge TLS & Reverse Proxy** | Caddy 2 reverse proxy (`Caddyfile`, `compose.staging.yaml`), auto-TLS for `gateway.staging.shlita.xyz` | ⚠️ SPEC READY / HOST BLOCKED | Specification complete; requires live public DNS delegation |
 | **4. Locked Staging Security** | `packages/gateway/src/security-config.ts` fails closed on `SHLITA_ALLOW_SIMULATION=true` or missing secrets | ✅ PASS | `tests/step-12/staging.deployment.test.ts` (test 1) |
 | **5. Safe Fork PR CI** | `.github/workflows/deploy.yml` runs build/image jobs on untrusted PRs with local fixtures | ✅ PASS | Tested locally; zero production secrets exposed to fork PRs |
-| **6. Image Rollback Procedure** | `scripts/rollback.sh` automated image pinning script without volume data loss | ✅ PASS | Script created, documented, and made executable |
+| **6. Image Rollback Procedure** | `scripts/rollback.sh` automated image pinning script without volume data loss | ✅ PASS | Verified via `scripts/verify-compose-rollback.sh` & `tests/step-18/compose.rollback.test.ts` (pre-pull safety, ledger continuity, worker coexistence) |
 | **7. Health & Readiness Monitoring** | Public uncredentialed `GET /health`, `GET /ready`, `GET /metrics` | ✅ PASS | Verified in `tests/step-12/staging.deployment.test.ts` |
 | **8. Smoke Test & Latency Probe** | `scripts/staging-smoke-test.mjs` measuring latency and HTTP statuses | ✅ PASS | Probes `/health` and `/ready` with automated summary output |
 | **9. Automated Backup Worker** | `compose.staging.yaml` sidecar running `node dist/packages/gateway/src/backup-cli.js` with direct volume mount | ✅ PASS | Verified writable external backup mount, `VACUUM INTO`, retention pruning |
@@ -367,11 +367,16 @@ docker compose -f compose.staging.yaml up -d
 
 ---
 
-## 5. Rollback Runbook
+## 5. Rollback Runbook & Step 18 Verification Evidence
 
 If a newly deployed image exhibits anomalies or fails health checks:
 ```bash
 # Roll back to the previous known-good image digest/tag:
 ./scripts/rollback.sh ghcr.io/xiaoarnav/shlita:18989b421779f567aca026e2224fbcc0961a99af
 ```
-The rollback script verifies the target image, performs a graceful stop of the gateway container, starts the target image against the existing persistent volume `shlita-staging-data`, and waits for `/ready` to return 200. Zero ledger records are dropped.
+The rollback script executes the following safety invariants verified in Step 18:
+1. **Pre-Pull Availability Guard**: Verifies `docker pull <TARGET_IMAGE>` succeeds before modifying or stopping the running gateway. If an unavailable image is provided, the script fails closed immediately without stopping the healthy gateway.
+2. **Service Mutation Scope**: Strictly isolates service restart to `gateway` via `docker compose up -d --no-deps gateway`, preserving the `backup-worker` and edge proxy without disruption.
+3. **Durable Ledger Continuity**: Preserves the named SQLite volume `shlita-staging-data` across container replacement. Existing financial operations, agent configurations, and `PRAGMA integrity_check` pass intact.
+4. **Automated Bounded Verification**: Polls `/ready` until HTTP 200 is confirmed (up to 30s) before reporting success.
+5. **Automated Drill**: The full workflow is verified automatically via `scripts/verify-compose-rollback.sh` and `tests/step-18/compose.rollback.test.ts`.

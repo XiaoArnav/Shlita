@@ -165,6 +165,11 @@ jobs:
           export SHLITA_IMAGE="shlita:step5"
           bash -x scripts/verify-compose-backup-worker.sh
 
+      - name: Verify Compose image rollback preserves ledger
+        run: |
+          export SHLITA_IMAGE="shlita:step5"
+          bash -x scripts/verify-compose-rollback.sh
+
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
