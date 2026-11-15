@@ -65,7 +65,13 @@ npm install /tmp/shlita-sdk/shlita-sdk-0.1.0.tgz
 
 Verify that the package imports cleanly via public exports:
 ```typescript
-import { ShlitaAgentClient, ShlitaOperatorClient } from 'shlita-sdk';
+import {
+  ShlitaAgentClient,
+  ShlitaOperatorClient,
+  ShlitaApiError,
+  ShlitaClientError,
+  ShlitaUncertainError,
+} from 'shlita-sdk';
 ```
 
 ---
