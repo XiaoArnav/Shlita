@@ -276,6 +276,7 @@ docker volume create "$REC_BACKUPS_VOLUME" >/dev/null
 
 echo "Executing restore via restore-cli into fresh volume $REC_DATA_VOLUME..."
 docker run --rm \
+  --entrypoint "" \
   -v "${SRC_PROJECT}-backups:/var/backups/shlita-external:ro" \
   -v "${REC_DATA_VOLUME}:/var/lib/shlita" \
   -u 10001:10001 \
@@ -285,6 +286,7 @@ docker run --rm \
 # Run PRAGMA integrity_check on the restored database
 echo "Verifying PRAGMA integrity_check on restored database..."
 INTEGRITY_ROW="$(docker run --rm \
+  --entrypoint "" \
   -v "${REC_DATA_VOLUME}:/var/lib/shlita:ro" \
   -u 10001:10001 \
   "$IMAGE_NAME" \
