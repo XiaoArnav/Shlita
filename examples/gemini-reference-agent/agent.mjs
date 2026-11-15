@@ -11,14 +11,7 @@ import {
   SAMPLE_MINT,
 } from './fixtures.mjs';
 
-let sdk;
-try {
-  sdk = await import('shlita-sdk');
-} catch {
-  sdk = await import('../../packages/sdk/dist/index.js');
-}
 
-export const { ShlitaAgentClient, ShlitaOperatorClient } = sdk;
 
 /**
  * Tool declaration adhering to the official Google Gemini API specification.

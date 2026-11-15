@@ -1,6 +1,4 @@
-import type { ShlitaAgentClient, ShlitaOperatorClient } from '../../packages/sdk/src/index.js';
-
-export { ShlitaAgentClient, ShlitaOperatorClient };
+import type { ShlitaAgentClient } from '../../packages/sdk/src/index.js';
 
 export const GEMINI_TOOL_DECLARATIONS: Array<{
   name: string;

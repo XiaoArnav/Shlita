@@ -20,16 +20,31 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  runGeminiAgent,
-  ShlitaAgentClient,
-  ShlitaOperatorClient,
-} from './agent.mjs';
+import { runGeminiAgent } from './agent.mjs';
 import { SAMPLE_MINT } from './fixtures.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '../..');
+
+let ShlitaAgentClient;
+let ShlitaOperatorClient;
+
+try {
+  const sdk = await import('shlita-sdk');
+  ShlitaAgentClient = sdk.ShlitaAgentClient;
+  ShlitaOperatorClient = sdk.ShlitaOperatorClient;
+} catch {
+  const sdkDist = path.resolve(root, 'packages/sdk/dist/index.js');
+  if (!fs.existsSync(sdkDist)) {
+    const { execFileSync } = await import('node:child_process');
+    execFileSync(process.execPath, [path.resolve(root, 'node_modules/typescript/lib/tsc.js'), '-p', path.resolve(root, 'packages/sdk/tsconfig.json')], { stdio: 'inherit' });
+  }
+  const { pathToFileURL } = await import('node:url');
+  const sdk = await import(pathToFileURL(sdkDist).href);
+  ShlitaAgentClient = sdk.ShlitaAgentClient;
+  ShlitaOperatorClient = sdk.ShlitaOperatorClient;
+}
 
 const args = process.argv.slice(2);
 function getArg(flag, defaultVal) {
