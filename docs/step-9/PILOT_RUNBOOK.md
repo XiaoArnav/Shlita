@@ -291,24 +291,86 @@ tar czf shlita-pilot-archive-$(date +%Y%m%d).tar.gz /var/lib/shlita/
 
 ---
 
-## 10. Rollback Procedure
+## 10. Rollback Procedures
 
-If a critical issue is discovered during the pilot:
+### 10.1 Gateway Container Image Rollback (`scripts/rollback.sh`)
+
+If a software defect or breaking change is deployed in a new container image, roll back the gateway to a previous known-good image while preserving the durable SQLite ledger volume.
+
+#### Canonical Rollback Command:
+```bash
+# Syntax: ./scripts/rollback.sh <PREVIOUS_IMAGE_TAG_OR_DIGEST>
+./scripts/rollback.sh ghcr.io/xiaoarnav/shlita:bc7f2d2f8563d1d15329038d68ce872c48f454d0
+```
+
+#### Selecting a Compatible Target Image:
+- Always select an immutable commit SHA tag (e.g. `ghcr.io/xiaoarnav/shlita:<full-sha>`) or content digest (`ghcr.io/xiaoarnav/shlita@sha256:<digest>`).
+- Consult GitHub Deployment records or `.github/workflows/deploy.yml` release history for verified staging/production SHAs.
+- Never use mutable tags like `:latest` or `:staging` for production rollbacks.
+
+#### Failure Safety (Pre-Pull Invariant):
+- `scripts/rollback.sh` executes `docker pull <TARGET_IMAGE>` in Step 1 before stopping the running gateway.
+- If the image reference cannot be pulled (due to typo, network partition, or missing registry credentials), the script aborts immediately with a non-zero exit code under `set -eu`.
+- **The running gateway container is NOT stopped or modified**, preventing accidental downtime.
+
+#### Service Scope & Worker Coexistence:
+- `scripts/rollback.sh` intentionally isolates changes to the customer-facing `gateway` service using:
+  `SHLITA_IMAGE="${TARGET_IMAGE}" docker compose -f "${COMPOSE_FILE}" up -d --no-deps gateway`
+- The `backup-worker` and `caddy` services continue operating uninterrupted.
+- If the rollback includes a database schema rollback requiring the backup worker to be synchronized, execute:
+  `SHLITA_IMAGE="<TARGET_IMAGE>" docker compose -f compose.staging.yaml up -d --no-deps backup-worker`
+
+#### Post-Rollback Readiness and Ledger Continuity Verification:
+1. **Readiness Probe**: The script automatically polls `/ready` inside the rolled-back container for up to 30 seconds until HTTP 200 is confirmed.
+2. **Ledger Volume Verification**: Ensure the persistent volume (`shlita-staging-data`) remained mounted:
+   ```bash
+   docker inspect --format='{{range .Mounts}}{{if eq .Destination "/var/lib/shlita"}}{{.Name}}{{end}}{{end}}' shlita-staging-gateway
+   ```
+3. **Database Integrity Check**: Run PRAGMA integrity check inside the rolled-back container:
+   ```bash
+   docker compose -f compose.staging.yaml exec -T gateway node -e '
+     const { DatabaseSync } = await import("node:sqlite");
+     const db = new DatabaseSync("/var/lib/shlita/ledger.db", { readOnly: true });
+     console.log(db.prepare("PRAGMA integrity_check").get());
+     db.close();
+   '
+   ```
+4. **Operation Audit**: Verify existing financial operations remain intact via operator API:
+   ```bash
+   curl -s http://127.0.0.1:4000/v1/operations \
+     -H "x-shlita-operator-key: $SHLITA_OPERATOR_KEY" | jq '.operations | length'
+   ```
+
+#### Troubleshooting Image Pull Failures:
+If rollback exits non-zero on `[1/4] Pulling target image...`:
+1. Check registry authentication: `echo $GITHUB_TOKEN | docker login ghcr.io -u <username> --password-stdin`.
+2. Inspect available local images: `docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}' | grep shlita`.
+3. If using an already-pulled or local image, set `SHLITA_SKIP_PULL=true ./scripts/rollback.sh <LOCAL_IMAGE_TAG>`.
+
+---
+
+### 10.2 Database Disaster Recovery (Ledger State Restore)
+
+If database corruption or catastrophic operator error occurs:
 
 1. **Freeze all agents** immediately via operator API or dashboard.
-2. **Create emergency backup** of the current database.
-3. **Stop the gateway** container (`docker compose stop gateway`).
-4. **Restore from known-good backup** using restore CLI:
+2. **Create emergency copy** of the current database file for forensic audit:
    ```bash
-   node dist/restore-cli.js /var/lib/shlita/backups/latest.db /var/lib/shlita/data/ledger.db
+   cp /var/lib/shlita/ledger.db /var/lib/shlita/ledger-corrupt-$(date +%Y%m%d%H%M%S).db
    ```
-5. **Restart the gateway** and verify `/ready` returns HTTP 200.
+3. **Stop the gateway** container (`docker compose stop gateway`).
+4. **Restore from verified snapshot** using restore CLI:
+   ```bash
+   node dist/packages/gateway/src/restore-cli.js /var/backups/shlita-external/<snapshot-file>.db /var/lib/shlita/ledger.db
+   ```
+5. **Restart the gateway** (`docker compose up -d gateway`) and verify `/ready` returns HTTP 200.
 6. **Notify partners** of the incident and resolution.
 
 ---
 
 ## 11. Staging & Pilot Status
 
+- **Step 18 Local Rollback and Recovery Drill**: Verified. Standalone rollback script (`scripts/rollback.sh`), automated compose drill (`scripts/verify-compose-rollback.sh`), failure-before-stopping invariant on unavailable image, gateway image downgrade, ledger volume persistence, SQLite `PRAGMA integrity_check: ok`, financial operation survival (`ACCOUNTING_COMMITTED`), and worker coexistence verified locally and in CI.
 - **Step 17 Local Alert Rehearsal**: Verified. Standalone readiness monitor (`scripts/readiness-monitor.mjs`), automated drill (`scripts/alert-rehearsal.mjs`), healthy baseline, brief interruption suppression, single outage event delivery, duplicate suppression, single recovery event delivery, bounded webhook retry on failure, and clean process teardown verified locally.
 - **Step 16 Local Pilot Rehearsal**: Verified. Packaged SDK, external install, all 6 developer/operator scenarios pass with persistent SQLite storage and zero secret leaks.
 - **Step 12 Hosted Staging**: Tracked in PR #19 pending approval of an accessible Linux host (`gateway.staging.shlita.xyz`) and webhook secret (`SHLITA_ALERT_WEBHOOK_URL`) for live cloud execution of `LIVE-ALERT-01`.
