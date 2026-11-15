@@ -2,11 +2,13 @@
 
 **Document Reference:** `docs/step-21/INTERNAL_RELEASE_REHEARSAL.md`  
 **Parent Milestone:** Step 21 — Internal Release Rehearsal and Pilot Handoff  
-**Candidate Commit SHA:** `4786841689041b8a09eef8be5d7d45ae24f59043` (`main`)  
-**Maintainer Author:** Arnav Patel (`@XiaoArnav`)  
-**Date:** 2026-11-15  
-**Candidate CI Run:** [Run #43740538852](https://github.com/XiaoArnav/Shlita/actions/runs/43740538852) (`conclusion: success`)  
-**Supported Runtime:** Node.js `>=22.0.0` (Verified on Node.js `v24.22.1`)  
+**Candidate Commit SHA:** `4786841689041b8a09eef8be5d7d45ae24f59043` (`main`)<br/>
+**Merged `main` Commit (PR #28):** `5c3a89523668f57994042718825de91fd29a87f3`<br/>
+**Maintainer Author:** Arnav Patel (`@XiaoArnav`)<br/>
+**Date:** 2026-11-15<br/>
+**Candidate CI Run:** [Run #43740538852](https://github.com/XiaoArnav/Shlita/actions/runs/43740538852) (`conclusion: success`)<br/>
+**Merged `main` CI Run:** [Run #43742757703](https://github.com/XiaoArnav/Shlita/actions/runs/43742757703) (`conclusion: success`)<br/>
+**Supported Runtime:** Node.js `>=22.0.0` (Verified on Node.js `v24.22.1`)<br/>
 **Packaged SDK Archive:** `shlita-sdk-0.1.0.tgz`  
 **SDK Archive SHA-256:** `4abcee6076ae815ca286205f1bf430bdbce69d708ff8f73d2c97bfc0f5ca67d6`  
 **Internal Release Verdict:** **`READY`**  
@@ -129,7 +131,7 @@ node examples/gemini-reference-agent/run.mjs
 
 | Rehearsal Workflow | Test Command / Harness | Evidence & Key Observations | Verdict |
 | :--- | :--- | :--- | :---: |
-| **Full Unit & Integration Suite** | `npm test` | 177 tests passed across 28 test files in 3.9s. Complete coverage of core ledger, proxy, security, rollback, alerts, and recovery. | **PASS** |
+| **Full Unit & Integration Suite** | `npm test` | 177 tests passed across 28 test files in 3.9s. Verifies ACID state transitions, budget ceilings, SSRF firewalling, multi-tenant isolation, idempotency deduplication, Compose image rollback pre-pull guards, and backup worker integrity. | **PASS** |
 | **Dashboard Browser Verification** | `npm run test:browser` | Headless Playwright Chromium E2E test verifying operator login, CSRF tokens, telemetry streaming, agent freeze, and session logout. | **PASS** |
 | **Local Pilot Developer/Operator Drill** | `node scripts/pilot-rehearsal.mjs` | Verified all 6 scenarios: (s1) first allowed call committed with 10000 µUSDC; (s2) unapproved vendor rejected; (s3) idempotent replay returns matching ID; (s4) ledger records `ACCOUNTING_COMMITTED` with `NOT_SUBMITTED`; (s5) operator freeze blocks subsequent calls (`AGENT_FROZEN`); (s6) operation and freeze status persist across restart. | **PASS** |
 | **Readiness Alert & Webhook Delivery** | `node scripts/alert-rehearsal.mjs` | Verified SRE probe lifecycle: healthy baseline, brief interruption suppression (flap damping), single outage webhook (`gateway_outage`, `inc_1794764035034`), duplicate suppression, single recovery webhook (`gateway_recovered`), and bounded retries on webhook failure. | **PASS** |
@@ -145,7 +147,7 @@ node examples/gemini-reference-agent/run.mjs
 - Internal developers can build the SDK archive, install it into external projects, run agent workflows against local or development gateways, and inspect ledger operations without external dependencies or cloud credentials.
 
 ### 5.2 External Controlled Developer Pilot Verdict: **`NO-GO`**
-As documented in [`docs/step-10/PILOT_GO_NO_GO.md`](file:///Users/polymath/Antigravity/Yam/Shlita_repo/docs/step-10/PILOT_GO_NO_GO.md) and [`docs/step-12/STAGING_VERIFICATION.md`](file:///Users/polymath/Antigravity/Yam/Shlita_repo/docs/step-12/STAGING_VERIFICATION.md), onboarding external developer partners onto public staging (`https://gateway.staging.shlita.xyz`) is **NO-GO** pending maintainer infrastructure provisioning:
+As documented in [`PILOT_GO_NO_GO.md`](../step-10/PILOT_GO_NO_GO.md) and [`STAGING_VERIFICATION.md`](../step-12/STAGING_VERIFICATION.md), onboarding external developer partners onto public staging (`https://gateway.staging.shlita.xyz`) is **NO-GO** pending maintainer infrastructure provisioning:
 
 | Open External Prerequisite | Blocker ID | Impact on External Pilot | Maintainer Owner & Required Action |
 | :--- | :---: | :--- | :--- |
@@ -158,7 +160,7 @@ As documented in [`docs/step-10/PILOT_GO_NO_GO.md`](file:///Users/polymath/Antig
 
 ## 6. Maintenance & Operator Runbook Links
 
-- **Quickstart Guide:** [`docs/sdk/quickstart.md`](file:///Users/polymath/Antigravity/Yam/Shlita_repo/docs/sdk/quickstart.md) — Developer onboarding, SDK usage, agent enrollment, emergency freeze.
-- **Pilot Runbook:** [`docs/step-9/PILOT_RUNBOOK.md`](file:///Users/polymath/Antigravity/Yam/Shlita_repo/docs/step-9/PILOT_RUNBOOK.md) — Staging host deployment, rollback procedures, backup snapshot selection, offline restore.
-- **Staging Verification Report:** [`docs/step-12/STAGING_VERIFICATION.md`](file:///Users/polymath/Antigravity/Yam/Shlita_repo/docs/step-12/STAGING_VERIFICATION.md) — Detailed 4-check audit and blocker logs.
-- **Production Readiness Decision:** [`docs/step-10/PILOT_GO_NO_GO.md`](file:///Users/polymath/Antigravity/Yam/Shlita_repo/docs/step-10/PILOT_GO_NO_GO.md) — Four-tier launch decision matrix.
+- **Quickstart Guide:** [`docs/sdk/quickstart.md`](../sdk/quickstart.md) — Developer onboarding, SDK usage, agent enrollment, emergency freeze.
+- **Pilot Runbook:** [`docs/step-9/PILOT_RUNBOOK.md`](../step-9/PILOT_RUNBOOK.md) — Staging host deployment, rollback procedures, backup snapshot selection, offline restore.
+- **Staging Verification Report:** [`docs/step-12/STAGING_VERIFICATION.md`](../step-12/STAGING_VERIFICATION.md) — Detailed 4-check audit and blocker logs.
+- **Production Readiness Decision:** [`docs/step-10/PILOT_GO_NO_GO.md`](../step-10/PILOT_GO_NO_GO.md) — Four-tier launch decision matrix.
