@@ -53,6 +53,11 @@ export interface RunGeminiAgentResult {
   };
   providerData?: unknown;
   modelSummary?: string | null;
+  geminiFollowUp?: {
+    status: 'success' | 'failed' | 'omitted';
+    text: string | null;
+    error: string | null;
+  };
   toolDispatched?: boolean;
   textOnlyResponse?: string;
 }

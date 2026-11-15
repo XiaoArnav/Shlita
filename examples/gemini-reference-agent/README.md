@@ -260,7 +260,7 @@ To execute a live model reasoning call using Google Gemini:
 
 ```bash
 export GEMINI_API_KEY="<your-google-ai-studio-api-key>"
-node examples/gemini-reference-agent/run.mjs --mode live --scenario allowed
+node examples/gemini-reference-agent/run.mjs --mode live --scenario allowed --isolated
 ```
 
 ### Component Breakdown in Live Mode:
@@ -268,6 +268,7 @@ node examples/gemini-reference-agent/run.mjs --mode live --scenario allowed
 - **Application Perimeter**: Application validates the proposed function arguments (verifying strict Base58 encoding and address bounds).
 - **Shlita Policy Gateway**: Checks agent policy limits and approves the call.
 - **Downstream Provider**: By default, uses local simulation or mock upstream provider unless the gateway itself has a live Helius RPC credential configured.
+- **Isolated Gateway Option**: Passing `--isolated` or `--self-contained` ensures the smoke test spawns an isolated local gateway, ignoring any shell-inherited `SHLITA_GATEWAY_URL`.
 
 *(If `GEMINI_API_KEY` is not exported, live execution is marked `BLOCKED (pending external API key)`).*
 
@@ -295,3 +296,45 @@ console.log(operations);
 - `reservedAmountMicroUsdc`: Amount held in micro-USDC. `10000` equals \$0.010000 USDC.
 - `settlementStatus`: `NOT_SUBMITTED`. Proxy execution creates an estimated hold; tokens are only moved during subsequent batch settlement.
 - `signature`: `null` until on-chain settlement is performed.
+
+---
+
+## 8. Step 15 Live Gemini Verification Checkpoints & Evidence
+
+### Verification Status
+- **Live Gemini API Smoke Test**: `BLOCKED (pending external GEMINI_API_KEY)`. When running without `GEMINI_API_KEY`, `node examples/gemini-reference-agent/run.mjs --mode live --scenario allowed --isolated` exits `1` with:
+  ```text
+  Error: Missing GEMINI_API_KEY (or --gemini-api-key).
+  When running with "--mode live", a Google Gemini API key is required.
+  ```
+- **Deterministic Two-Turn Protocol Verification**: `PASS` (4/4 integration tests in `tests/step-15/gemini.live-verification.test.ts`).
+
+### Step 15 Checkpoint Matrix
+
+| Checkpoint | Allowed Scenario (`--scenario allowed`) | Denied Scenario (`--scenario denied`) |
+| :--- | :--- | :--- |
+| **Gemini Tool Proposal** | Gemini proposes `get_solana_token_metadata` with valid argument `mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"`. | Gemini proposes identical tool call `get_solana_token_metadata` with valid argument `mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"`. |
+| **Shlita Policy Decision** | Shlita SDK returns `outcome: "committed"`, immutable `operationId: "op_..."`, and reserves `10,000` µUSDC ($0.0100 USDC) in SQLite WAL storage. | Shlita SDK returns `outcome: "rejected"`, `reason: "UNAPPROVED_VENDOR"`, `operationId: null`, and reserves `0` µUSDC. |
+| **Gemini Follow-up Synthesis** | Gemini accepts the structured function response (`status: 'SUCCESS'`), receives preserved model history + tool declarations, and returns synthesized text. `geminiFollowUp.status === 'success'`. | Gemini accepts structured rejection (`status: 'POLICY_REJECTED'`, `reason: 'UNAPPROVED_VENDOR'`) and synthesizes an advisory. Shlita's policy rejection remains the authoritative developer verdict. `geminiFollowUp.status === 'success'`. |
+| **Execution Evidence** | - Model: Live (pending key) / Fixture (`gemini-2.5-flash`)<br>- Gateway: Isolated local SQLite instance (`--isolated`)<br>- Downstream: Simulated / Mock upstream received **exactly 1 dispatch**. | - Model: Live (pending key) / Fixture (`gemini-2.5-flash`)<br>- Gateway: Isolated local SQLite instance (`--isolated`)<br>- Downstream: **0 dispatches** verified by test instrumentation. |
+
+### Dual Outcome Independence Invariant
+In earlier versions, a failure in Gemini's follow-up synthesis could be silenced or replaced by fallback text while reporting a successful overall exit code. Step 15 establishes strict independence:
+1. **Explicit Follow-up Status**: The result object exposes `geminiFollowUp: { status: 'success' | 'failed' | 'omitted', text, error }`.
+2. **Strict Smoke Test Failure**: In `--mode live`, if Gemini fails to synthesize a response (e.g., HTTP 500 or timeout), `run.mjs` exits non-zero (`code 1`) even if the gateway committed the hold.
+3. **Single Gateway Dispatch Invariant**: The gateway is dispatched **strictly once** per scenario. Even if the model follow-up fails or is retried, the initial hold is preserved for operator auditing and zero additional gateway reservations are created.
+
+### Isolated Local Gateway Guarantee
+To prevent shell-inherited variables (`SHLITA_GATEWAY_URL`) from inadvertently pointing the test at an external or staging gateway, `run.mjs` supports the `--isolated` (or `--self-contained`) flag. When passed, `run.mjs` forces the gateway target to an ephemeral local server with local SQLite storage.
+
+### Commands to Rerun Live Verification (Once Key is Configured)
+```bash
+# 1. Export your Gemini API key
+export GEMINI_API_KEY="AIzaSy..."
+
+# 2. Run the allowed scenario smoke test through an isolated local gateway
+node examples/gemini-reference-agent/run.mjs --mode live --scenario allowed --isolated
+
+# 3. Run the policy-denied scenario smoke test
+node examples/gemini-reference-agent/run.mjs --mode live --scenario denied --isolated
+```

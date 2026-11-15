@@ -199,13 +199,24 @@ export async function runGeminiAgent({
 
   // 6. Return Structured Function Result to Gemini (if in live mode)
   let finalModelText = null;
+  let followUpStatus = 'omitted';
+  let followUpError = null;
+
   if (isLive) {
     try {
-      const functionResponse = {
+      const functionResponseData = {
         status: proxyResult.outcome === 'committed' ? 'SUCCESS' : 'POLICY_REJECTED',
         outcome: proxyResult.outcome,
-        reason: proxyResult.outcome === 'rejected' ? proxyResult.reason : undefined,
-        data: proxyResult.outcome === 'committed' ? proxyResult.upstream : undefined,
+        reason: proxyResult.outcome === 'rejected' ? (proxyResult.reason || proxyResult.error || 'UNAPPROVED_VENDOR') : null,
+        data: proxyResult.outcome === 'committed' ? (proxyResult.upstream ?? null) : null,
+      };
+
+      const functionResponsePart = {
+        functionResponse: {
+          name: call.name,
+          response: functionResponseData,
+          ...(call.id ? { id: call.id } : {}),
+        },
       };
 
       const followUp = await callGeminiApi({
@@ -213,32 +224,39 @@ export async function runGeminiAgent({
         model: geminiModel,
         contents: [
           { role: 'user', parts: [{ text: userPrompt }] },
-          { role: 'model', parts: [{ functionCall: call }] },
+          candidate.content,
           {
             role: 'user',
-            parts: [
-              {
-                functionResponse: {
-                  name: call.name,
-                  response: functionResponse,
-                },
-              },
-            ],
+            parts: [functionResponsePart],
           },
         ],
-        // Mode NONE or omitted tools prevents model from attempting a second tool call
+        tools: GEMINI_TOOL_DECLARATIONS,
         toolConfig: { functionCallingConfig: { mode: 'NONE' } },
         fetchImpl,
       });
 
       finalModelText = followUp.candidates?.[0]?.content?.parts?.find((p) => p.text)?.text || null;
+      if (finalModelText) {
+        followUpStatus = 'success';
+      } else {
+        followUpStatus = 'failed';
+        followUpError = 'Gemini returned an empty response with no text candidate.';
+      }
     } catch (err) {
-      finalModelText = `[Follow-up Gemini synthesis omitted: ${err.message}]`;
+      followUpStatus = 'failed';
+      followUpError = err instanceof Error ? err.message : String(err);
+      finalModelText = null;
     }
   } else {
+    followUpStatus = 'success';
     finalModelText = FIXTURE_GEMINI_FINAL_RESPONSE.candidates[0].content.parts[0].text;
   }
 
   developerOutcome.modelSummary = finalModelText;
+  developerOutcome.geminiFollowUp = {
+    status: followUpStatus,
+    text: finalModelText,
+    error: followUpError,
+  };
   return developerOutcome;
 }

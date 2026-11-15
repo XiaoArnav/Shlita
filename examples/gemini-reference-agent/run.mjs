@@ -59,7 +59,9 @@ const mode = getArg('--mode', process.env.GEMINI_MODE || 'fixture');
 const scenario = getArg('--scenario', process.env.SCENARIO || 'both');
 const explicitSimulateFlag = hasFlag('--simulate') || process.env.SHLITA_SIMULATE === 'true';
 
-let gatewayUrl = getArg('--gateway-url', process.env.SHLITA_GATEWAY_URL);
+const explicitGatewayUrl = getArg('--gateway-url', null);
+const forceIsolated = hasFlag('--isolated') || hasFlag('--self-contained') || process.env.SHLITA_ISOLATED === 'true';
+let gatewayUrl = forceIsolated ? null : (explicitGatewayUrl || process.env.SHLITA_GATEWAY_URL);
 let allowedApiKey = getArg('--allowed-api-key', process.env.SHLITA_ALLOWED_API_KEY || process.env.SHLITA_API_KEY);
 let deniedApiKey = getArg('--denied-api-key', process.env.SHLITA_DENIED_API_KEY);
 let operatorKey = getArg('--operator-key', process.env.SHLITA_OPERATOR_KEY);
@@ -237,9 +239,15 @@ try {
     if (allowedResult.shlita.outcome !== 'committed') {
       throw new Error(`Scenario 1 failed: Expected outcome 'committed', got '${allowedResult.shlita.outcome}' (reason: ${allowedResult.shlita.reason})`);
     }
+    if (mode === 'live' && allowedResult.geminiFollowUp?.status === 'failed') {
+      throw new Error(`Scenario 1 failed: Gemini follow-up synthesis failed: ${allowedResult.geminiFollowUp.error}`);
+    }
     const microUsdc = allowedResult.shlita.reservedAmountMicroUsdc;
     const usdc = microUsdc ? (Number(microUsdc) / 1_000_000).toFixed(4) : '0.0000';
-    console.log(`\n✓ Verdict: Call APPROVED. Reserved ${microUsdc} micro-USDC ($${usdc} USDC) in Shlita ledger.\n`);
+    console.log(`\n✓ Verdict: Call APPROVED. Reserved ${microUsdc} micro-USDC ($${usdc} USDC) in Shlita ledger.`);
+    if (allowedResult.geminiFollowUp) {
+      console.log(`✓ Gemini Follow-up : [${allowedResult.geminiFollowUp.status.toUpperCase()}] ${allowedResult.geminiFollowUp.error || 'Synthesized final response'}\n`);
+    }
   }
 
   // Execute Scenario 2: Denied Call
@@ -272,7 +280,13 @@ try {
     if (deniedResult.shlita.outcome !== 'rejected') {
       throw new Error(`Scenario 2 failed: Expected outcome 'rejected', got '${deniedResult.shlita.outcome}' (reason: ${deniedResult.shlita.reason})`);
     }
-    console.log(`\n✓ Verdict: Call BLOCKED by Shlita policy perimeter (${deniedResult.shlita.reason}). 0 provider calls dispatched, 0 micro-USDC reserved in ledger.\n`);
+    if (mode === 'live' && deniedResult.geminiFollowUp?.status === 'failed') {
+      throw new Error(`Scenario 2 failed: Gemini follow-up synthesis failed: ${deniedResult.geminiFollowUp.error}`);
+    }
+    console.log(`\n✓ Verdict: Call BLOCKED by Shlita policy perimeter (${deniedResult.shlita.reason}). 0 provider calls dispatched, 0 micro-USDC reserved in ledger.`);
+    if (deniedResult.geminiFollowUp) {
+      console.log(`✓ Gemini Follow-up : [${deniedResult.geminiFollowUp.status.toUpperCase()}] ${deniedResult.geminiFollowUp.error || 'Synthesized rejection response'}\n`);
+    }
   }
 
   // Print ledger audit state if operatorKey is present
