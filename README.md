@@ -5,7 +5,7 @@
 
 ![Shlita - Financial Firewall for Autonomous AI Agents](assets/thumbnail.jpg)
 
-[![CI Test Matrix](https://img.shields.io/badge/CI-106%20Passed-14F195?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/XiaoArnav/Shlita/actions/runs/43374212468)
+[![CI Test Matrix](https://img.shields.io/badge/CI-182%20Passed-14F195?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/XiaoArnav/Shlita/actions/runs/43742757703)
 [![Browser E2E](https://img.shields.io/badge/Playwright-Chromium%20Verified-green?style=flat-square&logo=playwright&logoColor=white)](docs/step-11/DASHBOARD_BROWSER_VERIFICATION.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Node%2022-3178C6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.json)
 [![Static Demo](https://img.shields.io/badge/Vercel-Static%20Demo-000000?style=flat-square&logo=vercel&logoColor=white)](https://shlita.vercel.app/?demo=1)
@@ -23,9 +23,11 @@ When agents execute autonomous workflows, granting them direct access to credit 
 Shlita sits between your AI agent and upstream paid APIs (such as Solana RPCs, LLM inference endpoints, or web search services). It intercepts each outbound call, validates provider policies, reserves funds atomically in an ACID-backed SQLite ledger, injects upstream credentials server-side, and records every spending outcome for complete auditability.
 
 ### Start Here
-- ⚡ **Interactive Dashboard Demo**: [shlita.vercel.app/?demo=1](https://shlita.vercel.app/?demo=1) (static UI preview with sample data)
-- 🚀 **Quickstart Guide**: Jump straight to [Local Quickstart](#quickstart) or [Developer Quickstart](docs/sdk/quickstart.md)
-- 📦 **Agent SDK**: [Install `shlita-sdk`](#agent-sdk-integration) to wrap agent tool calls in spending guardrails
+- ⚡ **Interactive Dashboard Preview**: [shlita.vercel.app/?demo=1](https://shlita.vercel.app/?demo=1) or [GitHub Pages](https://xiaoarnav.github.io/Shlita/?demo=1) (static client-side preview with sample balance and telemetry data; no live backend connected)
+- 🤖 **Gemini Reference Agent Demo**: Run `node examples/gemini-reference-agent/run.mjs` (isolated local gateway, local downstream simulation, deterministic model fixture; zero API keys required; demonstrates both permitted spending and perimeter policy rejection)
+- 📦 **Agent SDK Package**: Pack and install `shlita-sdk` ([Developer Quickstart](docs/sdk/quickstart.md) or [SDK Integration](#agent-sdk-integration))
+- 🚀 **Local Quickstart**: Launch the full local gateway and live control plane ([Local Quickstart](#quickstart))
+- 📋 **Release Handoff & Staging Status**: Inspect verified commit evidence and pilot blockers ([Step 22 Release Handoff](docs/step-22/INTERNAL_RELEASE_HANDOFF.md) and [Step 21 Rehearsal Report](docs/step-21/INTERNAL_RELEASE_REHEARSAL.md))
 - 📖 **API Specification**: [OpenAPI Contract (YAML)](docs/api/openapi.yaml)
 - 📺 **Video Walkthrough**: [Watch the Demo on YouTube](https://youtu.be/o5vHfcUjDJE)
 - 📝 **Architecture Deep Dive**: [Read on DEV.to](https://dev.to/polymath_arnav/why-we-built-a-financial-firewall-for-autonomous-ai-agents-on-solana-acid-reservations-zero-key-4mfe)
@@ -74,7 +76,7 @@ flowchart LR
 - 🔁 **Financial Idempotency**: Cryptographically fingerprints requests (`idempotencyKey` + payload hash) to prevent duplicate execution or payload mutation on network retries.
 - 🛑 **Operator Freeze Controls**: Operators can instantly freeze individual agents via UI or API. Freeze state persists durably in SQLite across gateway restarts.
 - 📊 **Live Telemetry & Dashboard Streaming**: Operator control dashboard displays live ledger transactions, per-agent budget utilization, and real-time event telemetry that auto-refreshes without manual page reload.
-- 🔑 **Server-Side Secret Injection**: Agent processes receive scoped Shlita API keys. Upstream provider secrets (Helius, Tavily) are injected by the gateway and never exposed to the agent runtime. Gemini integration is planned for a follow-up release.
+- 🔑 **Server-Side Secret Injection & LLM Tool Protection**: Agent processes receive scoped Shlita API keys. Upstream provider secrets (Helius, Tavily) are injected by the gateway and never exposed to the agent runtime. Autonomous LLMs (including Google Gemini) propose tool calls that are validated at the application perimeter and governed by spending policies before provider dispatch.
 
 ---
 
@@ -84,16 +86,17 @@ Shlita’s behavior is independently audited and backed by reproducible automate
 
 | Capability / Surface | Verified Status | Tested Environment & Evidence |
 |---|---|---|
-| **Automated Test Matrix** | ✅ **106 tests passed** (16 files) | Node 24.22.1 in Ubuntu CI & macOS ([CI Run 43374212468](https://github.com/XiaoArnav/Shlita/actions/runs/43374212468)) |
-| **Dashboard Browser E2E** | ✅ **Verified in Chromium** | Playwright v1.65.0 headless browser test ([DASHBOARD_BROWSER_VERIFICATION.md](docs/step-11/DASHBOARD_BROWSER_VERIFICATION.md)) |
-| **SDK External Install** | ✅ **Verified Tarball Install** | External temporary consumer project outside repository ([`sdk.consumer.test.ts`](tests/sdk.consumer.test.ts)) |
-| **Docker Persistence** | ✅ **Verified WAL Persistence** | Container stop/start test preserves state on `/var/lib/shlita` volume |
-| **Static UI Mirrors** | 🌐 **Static Frontend Only** | [Vercel Demo](https://shlita.vercel.app/) and [GitHub Pages](https://xiaoarnav.github.io/Shlita/) (pre-rendered UI, no live backend) |
+| **Automated Test Matrix** | ✅ **182 tests passed** (29 files) | Node 24.22.1 in Ubuntu CI & macOS ([CI Run 43742757703](https://github.com/XiaoArnav/Shlita/actions/runs/43742757703)) |
+| **Gemini Reference Agent** | ✅ **Verified Fixture & Two-Turn Flow** | Deterministic tool call validation, proxying, and policy rejection ([`examples/gemini-reference-agent/`](examples/gemini-reference-agent/)) |
+| **Dashboard Browser E2E** | ✅ **Verified in Chromium** | Playwright headless browser test ([DASHBOARD_BROWSER_VERIFICATION.md](docs/step-11/DASHBOARD_BROWSER_VERIFICATION.md)) |
+| **SDK External Install** | ✅ **Verified Tarball Install** | `shlita-sdk-0.1.0.tgz` archive verified in external consumer project ([`tests/sdk.consumer.test.ts`](tests/sdk.consumer.test.ts)) |
+| **Docker Persistence & Recovery** | ✅ **Verified WAL Persistence & Recovery** | Verified container restart persistence, Compose image rollback, and scheduled backup recovery |
+| **Static UI Mirrors** | 🌐 **Static Frontend Only** | [Vercel Demo](https://shlita.vercel.app/?demo=1) and [GitHub Pages](https://xiaoarnav.github.io/Shlita/?demo=1) (pre-rendered UI with sample balance data, no live backend) |
 | **Local Gateway Runtime** | 💻 **Supported Entry Point** | `npm start` serves the gateway API (`/v1`) and control dashboard from a single origin |
-| **Public Gateway Deployment** | ⏳ **Tracked Under Step 12** | Container image published to GHCR; persistent public HTTPS gateway pending hosting setup |
+| **Public Gateway Deployment** | ⏳ **Tracked Under Steps 12 & 20** | Container image published to GHCR; persistent public HTTPS gateway pending cloud host provisioning (`BLOCKER-HOST-01`) |
 | **Solana Settlement Logic** | ⚠️ **Unit Math Passing / Funded Blocked** | 9 unit tests pass. Funded local validator test is historically reported (PR #5) and currently blocked by missing BPF binary in git |
 
-> Detailed findings, claim reconciliations, and readiness scorecards are documented in the [Step 11 Verification Baseline](docs/step-11/VERIFICATION_BASELINE.md).
+> For complete candidate verification evidence, see the [Step 21 Internal Release Rehearsal](docs/step-21/INTERNAL_RELEASE_REHEARSAL.md) and [Step 22 Internal Release Handoff](docs/step-22/INTERNAL_RELEASE_HANDOFF.md). Detailed baseline findings are documented in the [Step 11 Verification Baseline](docs/step-11/VERIFICATION_BASELINE.md).
 
 ---
 
@@ -112,8 +115,11 @@ npm install
 
 ### 2. Run Automated Verification
 ```bash
-# Run unit, integration, security, and SDK tests (106 tests)
+# Run unit, integration, security, and SDK tests (182 tests across 29 test suites)
 npm test
+
+# Run deterministic Gemini reference agent spending policy demo
+node examples/gemini-reference-agent/run.mjs
 
 # Run Playwright Chromium end-to-end browser test
 npm run test:browser
@@ -158,8 +164,8 @@ Because `shlita-sdk` is private to this repository, pack a tarball to install in
 
 ```bash
 npm run build:sdk
-cd packages/sdk
-npm pack --pack-destination /tmp/shlita-sdk
+mkdir -p /tmp/shlita-sdk
+npm pack --pack-destination /tmp/shlita-sdk ./packages/sdk
 ```
 
 In your agent's project:
@@ -227,7 +233,7 @@ shlita/
 │   └── solana/                # Canonical Solana Subscriptions protocol integration
 ├── src/                       # React 18 + Vite + Tailwind v4 operator dashboard
 ├── demo/                      # Terminal attack simulation & circuit breaker script
-├── tests/                     # 106 automated Vitest tests & Playwright browser suite
+├── tests/                     # 182 automated Vitest tests (29 test suites) & Playwright browser suite
 ├── examples/                  # Runnable agent client & policy pattern samples
 ├── docs/                      # Architectural decision records & step audits
 │   ├── adr/                   # ADR 0001: Single-instance SQLite architecture
@@ -258,6 +264,9 @@ Every roadmap step produces permanent, independently auditable engineering artif
 
 | Milestone | Report Focus | Key Documents |
 |---|---|---|
+| **Step 22** | Internal Release Handoff & Documentation Audit | [Release Handoff](docs/step-22/INTERNAL_RELEASE_HANDOFF.md) • [Reproduction Guide](docs/step-22/INTERNAL_RELEASE_HANDOFF.md#2-developer-start--reproduction-workflow) |
+| **Step 21** | Internal Release Rehearsal & Candidate Verification | [Release Rehearsal](docs/step-21/INTERNAL_RELEASE_REHEARSAL.md) • [CI Verification](https://github.com/XiaoArnav/Shlita/actions/runs/43740538852) |
+| **Step 20** | Hosted Staging Acceptance & Pilot Readiness | [Staging Verification](docs/step-12/STAGING_VERIFICATION.md) • [Go/No-Go Decision](docs/step-10/PILOT_GO_NO_GO.md) |
 | **Step 12** | Persistent HTTPS Staging | [Staging Verification](docs/step-12/STAGING_VERIFICATION.md) • [Deployment Blueprint](docs/step-8/DEPLOYMENT_BLUEPRINT.md) • [Rollback Runbook](scripts/rollback.sh) |
 | **Step 11** | Engineering Baseline & Browser E2E | [Verification Baseline](docs/step-11/VERIFICATION_BASELINE.md) • [Browser E2E Report](docs/step-11/DASHBOARD_BROWSER_VERIFICATION.md) • [Claim Register](docs/step-11/CLAIM_EVIDENCE_REGISTER.md) • [Solana Reconciliation](docs/step-11/SOLANA_EVIDENCE_RECONCILIATION.md) |
 | **Step 10** | Security Audit & Production Gates | [Final Audit Synthesis](docs/step-10/FINAL_AUDIT.md) • [Security Verdict](docs/step-10/SECURITY_VERDICT.md) • [Master Release Gates](docs/step-10/RELEASE_GATES.md) • [Go/No-Go Decision](docs/step-10/PILOT_GO_NO_GO.md) |
