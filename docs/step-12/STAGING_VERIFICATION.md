@@ -1,29 +1,30 @@
-# Shlita — Step 12 & Step 20: Persistent HTTPS Staging Deployment Verification Report & Pilot Readiness
+# Shlita — Step 12, Step 20 & Step 23: Live Staging Acceptance Verification Report & Pilot Readiness
 
-**Document Reference:** `docs/step-12/STAGING_VERIFICATION.md`  
-**Parent Milestone:** Step 12 (Persistent HTTPS Staging Deployment) & Step 20 (Hosted Staging Acceptance and Pilot Readiness)  
-**Upstream Target:** `XiaoArnav/Shlita:main`  
-**Base Commit (PR #26 Merged):** `8ed5d4b4a1b0d74268e217c46b5dc43372f5cb3c`  
-**Current Merged `main` Commit:** `f6cec275248289623f6f8b8cf3371765307ff2ab`  
-**Baseline CI Run:** [Run #43738296658](https://github.com/XiaoArnav/Shlita/actions/runs/43738296658)  
-**Maintainer Author:** `Arnav Patel (@XiaoArnav)`  
-**Date:** 2026-11-15  
-**Target Staging URL:** `https://gateway.staging.shlita.xyz`  
-**Target Staging Endpoint:** `https://gateway.staging.shlita.xyz/ready`  
-**Target Container Image:** `ghcr.io/xiaoarnav/shlita:f6cec275248289623f6f8b8cf3371765307ff2ab` (`ghcr.io/xiaoarnav/shlita:staging`)  
-**Published Image Digest (GHCR):** `ghcr.io/xiaoarnav/shlita@sha256:ab6ff49dd7b991142af86923e7a30ae50c74a2e44efaa721583bc143b686d6f1`  
-**Host-Observed Image Digest:** None (`BLOCKED` — Cloud VM host unprovisioned; pending live deployment)  
-**GitHub Deployment Record:** `#7806731531` (Environment: `staging` — records GHCR publication, not live host execution)  
+**Document Reference:** `docs/step-12/STAGING_VERIFICATION.md`<br/>
+**Parent Milestone:** Step 12 (Persistent HTTPS Staging Deployment), Step 20 (Hosted Staging Acceptance), & Step 23 (Live Staging Acceptance and Pilot Go/No-Go)<br/>
+**Upstream Target:** `XiaoArnav/Shlita:main`<br/>
+**Base Commit (PR #26 Merged):** `8ed5d4b4a1b0d74268e217c46b5dc43372f5cb3c`<br/>
+**Step 20 Merged Commit:** `f6cec275248289623f6f8b8cf3371765307ff2ab`<br/>
+**Current Merged `main` Commit (PR #29 Merged):** `2e97bba81084b6ce65803e2d5fcc7662220d5cac`<br/>
+**Baseline CI Run:** [Run #43744429092](https://github.com/XiaoArnav/Shlita/actions/runs/43744429092)<br/>
+**Maintainer Author:** `Arnav Patel (@XiaoArnav)`<br/>
+**Date:** 2026-11-15<br/>
+**Target Staging URL:** `https://gateway.staging.shlita.xyz`<br/>
+**Target Staging Endpoint:** `https://gateway.staging.shlita.xyz/ready`<br/>
+**Target Container Image:** `ghcr.io/xiaoarnav/shlita:2e97bba81084b6ce65803e2d5fcc7662220d5cac` (`ghcr.io/xiaoarnav/shlita:staging`)<br/>
+**Published Image Digest (GHCR):** `ghcr.io/xiaoarnav/shlita@sha256:ab7c7f83e80a5aeac79c33fe602d805adc43f139cd64dfbeea94bdfa4f15c175`<br/>
+**Host-Observed Image Digest:** None (`BLOCKED` — Cloud VM host unprovisioned; pending live deployment)<br/>
+**GitHub Deployment Record:** `#7806731531` (Environment: `staging` — records GHCR publication, not live host execution)
 
 ---
 
 ## 1. Executive Summary & Verification Verdict
 
-Steps 12–20 establish the complete container infrastructure, locked staging validation, automated backup/restore flow, SRE monitoring probes, rollback procedures, local developer and operator rehearsals, scheduled backup recovery, and pilot readiness criteria for Shlita's single-instance persistent HTTPS staging deployment.
+Steps 12, 20, and 23 establish the complete container infrastructure, locked staging validation, automated backup/restore flow, SRE monitoring probes, rollback procedures, local developer and operator rehearsals, scheduled backup recovery, and pilot readiness criteria for Shlita's single-instance persistent HTTPS staging deployment.
 
 ### Overall Status: SPEC, LOCAL & CI VERIFICATION PASS — LIVE HOSTED ACCEPTANCE BLOCKED
 - **Engineering & Specification:** **PASS** (100% complete)
-- **Local & Container Invariant Tests:** **PASS** (177/177 unit/integration tests pass across 28 test files)
+- **Local & Container Invariant Tests:** **PASS** (186/186 unit/integration tests pass across 30 test files)
 - **Chromium Dashboard E2E Browser Test:** **PASS** (Playwright headless Chromium verified)
 - **SDK Consumer Archive Test:** **PASS** (Independent installation outside repository verified)
 - **Gemini Reference Agent Integration:** **PASS** (Steps 13 & 14 verified tool call validation, proxying, and policy denial)
@@ -161,11 +162,11 @@ Live public HTTPS staging requires infrastructure inputs outside repository code
 
 ```text
 ============================================================
- Shlita Step 12 & Step 20: Live Staging Acceptance Checks
+ Shlita Step 12, Step 20 & Step 23: Live Staging Acceptance Checks
  Target: https://gateway.staging.shlita.xyz (Host: gateway.staging.shlita.xyz)
- Timestamp: 2026-11-15T17:12:52Z
- Deployed Commit: f6cec275248289623f6f8b8cf3371765307ff2ab
- Published Image Digest: sha256:ab6ff49dd7b991142af86923e7a30ae50c74a2e44efaa721583bc143b686d6f1
+ Timestamp: 2026-11-15T18:16:49Z
+ Deployed Commit: 2e97bba81084b6ce65803e2d5fcc7662220d5cac
+ Published Image Digest: sha256:ab7c7f83e80a5aeac79c33fe602d805adc43f139cd64dfbeea94bdfa4f15c175
 ============================================================
 
 [LIVE-HTTPS-01] Checking public HTTPS reachability and TLS certificate...
@@ -204,7 +205,7 @@ LIVE-PERSIST-01 (Ledger Persistence Post-Redeploy) : BLOCKED
 LIVE-ALERT-01 (Outage & Recovery Notifications)    : BLOCKED
 LIVE-RESTORE-01 (Worker Snapshot Restore on Host)  : BLOCKED
 ============================================================
-VERDICT: Step 12 / Step 20 Live Acceptance is BLOCKED pending maintainer infrastructure provisioning.
+VERDICT: Step 12 / Step 20 / Step 23 Live Acceptance is BLOCKED pending maintainer infrastructure provisioning.
 ```
 
 ---
@@ -214,7 +215,7 @@ VERDICT: Step 12 / Step 20 Live Acceptance is BLOCKED pending maintainer infrast
 If a newly deployed image exhibits anomalies or fails health checks on the staging host:
 ```bash
 # Roll back to the previous known-good image digest/tag:
-./scripts/rollback.sh ghcr.io/xiaoarnav/shlita:f6cec275248289623f6f8b8cf3371765307ff2ab
+./scripts/rollback.sh ghcr.io/xiaoarnav/shlita:2e97bba81084b6ce65803e2d5fcc7662220d5cac
 ```
 The rollback script executes the following safety invariants verified in Step 18:
 1. **Pre-Pull Availability Guard**: Verifies `docker pull <TARGET_IMAGE>` succeeds before modifying or stopping the running gateway. If an unavailable image is provided, the script fails closed immediately without stopping the healthy gateway.
@@ -225,28 +226,28 @@ The rollback script executes the following safety invariants verified in Step 18
 
 ---
 
-## 6. Controlled Developer Pilot Readiness & Go/No-Go Decision (Step 20)
+## 6. Controlled Developer Pilot Readiness & Go/No-Go Decision (Step 23 Review)
 
-Based on the criteria defined in `docs/step-10/PILOT_GO_NO_GO.md` (Tier B — Controlled External Developer Pilot), the evaluation of readiness for external partners is detailed below:
+Based on the criteria defined in [`PILOT_GO_NO_GO.md`](../step-10/PILOT_GO_NO_GO.md) (Tier B — Controlled External Developer Pilot), the evaluation of readiness for external partners is detailed below:
 
 ### 6.1 Audit of Tier B Criteria
 
 | Tier B Pilot Criterion | Requirement | Observed Status | Evidence & Reference | Owner & Next Action |
 | :--- | :--- | :---: | :--- | :--- |
-| **1. Dedicated Staging VM** | Single cloud VM running `compose.staging.yaml` with persistent volume | ❌ **UNMET** | No remote server provisioned. Active blocker: `BLOCKER-HOST-01`. | **Maintainer (`XiaoArnav`)**: Provision Linux host (e.g. Hetzner, AWS EC2, or Fly.io). |
-| **2. Public TLS Domain** | Public DNS A/AAAA record pointing `gateway.staging.shlita.xyz` to host with Caddy auto-TLS | ❌ **UNMET** | DNS lookup returns `NXDOMAIN`. Active blocker: `BLOCKER-DNS-01`. | **Maintainer (`XiaoArnav`)**: Add DNS record pointing to VM public IP. |
-| **3. Single-Instance Constraint** | Single writer on SQLite WAL database file (`replicas: 1`) | ✅ **READY** | Hardened in `compose.staging.yaml`; verified across restarts and image rollbacks in Step 18. | Fully satisfied in configuration. |
-| **4. Off-Host Telemetry & Alerts** | Readiness monitoring with delivery of outage and recovery notifications | ⚠️ **PARTIAL** | Monitor script `scripts/readiness-monitor.mjs` and flap damping verified in Step 17 rehearsal; destination webhook unconfigured. Active blocker: `BLOCKER-SECRET-01`. | **Maintainer (`XiaoArnav`)**: Provide webhook destination URL (`SHLITA_ALERT_WEBHOOK_URL`). |
-| **5. Sandboxed Partner Credentials & SDK** | Packaged SDK archive (`shlita-sdk-0.1.0.tgz`), quickstart documentation, and scoped agent keys | ✅ **READY** | Step 16 local pilot rehearsal verified clean-checkout developer onboarding, installation outside repo, policy rejection, and operator freeze survival. | Fully satisfied in repository. |
-| **6. Live Gemini Smoke Test** | Verified two-turn Gemini model execution through gateway proxy | ⏸️ **DEFERRED** | Deterministic Gemini fixture verified in Step 13/14; live API smoke test deferred until live key is supplied. | **Maintainer (`XiaoArnav`)**: Supply `GEMINI_API_KEY` for optional live smoke test. |
+| **1. Dedicated Staging VM** | Single cloud VM running [`compose.staging.yaml`](../../compose.staging.yaml) with persistent volume | ❌ **UNMET** | No remote server provisioned. Active blocker: `BLOCKER-HOST-01`. | **Maintainer (`XiaoArnav`)**: Authorize and provision a cloud Linux host (e.g. Hetzner CX22, AWS EC2 `t4g.small`, or Fly.io) with Docker & Docker Compose and public IPv4. |
+| **2. Public TLS Domain** | Public DNS A/AAAA record pointing `gateway.staging.shlita.xyz` to host with Caddy auto-TLS | ❌ **UNMET** | DNS lookup returns `NXDOMAIN`. Active blocker: `BLOCKER-DNS-01`. | **Maintainer (`XiaoArnav`)**: Add DNS A record pointing `gateway.staging.shlita.xyz` to VM public IP. Open ports 80/443 for Caddy ACME challenge. Refer to [`Caddyfile`](../../Caddyfile). |
+| **3. Single-Instance Constraint** | Single writer on SQLite WAL database file (`replicas: 1`) | ✅ **READY** | Hardened in [`compose.staging.yaml`](../../compose.staging.yaml); verified across restarts and image rollbacks in Step 18. | Fully satisfied in configuration. |
+| **4. Off-Host Telemetry & Alerts** | Readiness monitoring with delivery of outage and recovery notifications | ⚠️ **PARTIAL** | Monitor script `scripts/readiness-monitor.mjs` and flap damping verified in Step 17 rehearsal; destination webhook unconfigured. Active blocker: `BLOCKER-SECRET-01`. | **Maintainer (`XiaoArnav`)**: Provide webhook destination URL (`SHLITA_ALERT_WEBHOOK_URL`) and generate 32-hex `SHLITA_OPERATOR_KEY`. |
+| **5. Sandboxed Partner Credentials & SDK** | Packaged SDK archive (`shlita-sdk-0.1.0.tgz`), quickstart documentation, and scoped agent keys | ✅ **READY** | Step 16 local pilot rehearsal verified clean-checkout developer onboarding in [`PILOT_RUNBOOK.md`](../step-9/PILOT_RUNBOOK.md), installation outside repo, policy rejection, and operator freeze survival. | Fully satisfied in repository. |
+| **6. Live Gemini Smoke Test** | Verified two-turn Gemini model execution through gateway proxy | ⏸️ **DEFERRED** | Deterministic Gemini fixture verified in Step 13/14; live API smoke test deferred until live key is supplied. | **Maintainer (`XiaoArnav`)**: *(Optional)* Supply `GEMINI_API_KEY` for live smoke test. Non-Gemini partners can proceed without this. |
 
 ### 6.2 Formal Pilot Decision Verdict
 
-### **DECISION: NO-GO FOR IMMEDIATE LIVE TRAFFIC**  
+### **DECISION: NO-GO FOR IMMEDIATE LIVE TRAFFIC**<br/>
 ### **(CONDITIONAL GO PENDING HOST PROVISIONING & DNS DELEGATION)**
 
 #### Supporting Rationale:
-1. **Engineering Foundation is 100% Complete**: All software packages, gateway logic, rate limiting, security rules, SDK packaging, and CLI tooling are fully built and passing 177 automated tests across 28 files.
-2. **Operations & Recovery Drills Proven in CI**: Rollback (`scripts/verify-compose-rollback.sh`), scheduled backup recovery (`scripts/verify-compose-recovery.sh`), alert notifications (`scripts/alert-rehearsal.mjs`), and clean-checkout developer onboarding (`scripts/pilot-rehearsal.mjs`) have all succeeded with reproducible evidence.
+1. **Engineering Foundation is 100% Complete**: All software packages, gateway logic, rate limiting, security rules, SDK packaging, and CLI tooling are fully built and passing 186 automated tests across 30 files.
+2. **Operations & Recovery Drills Proven in CI**: Rollback (`scripts/verify-compose-rollback.sh`), scheduled backup recovery (`scripts/verify-compose-recovery.sh`), alert notifications (`scripts/alert-rehearsal.mjs`), clean-checkout developer onboarding (`scripts/pilot-rehearsal.mjs`), and release handoffs ([`INTERNAL_RELEASE_HANDOFF.md`](../step-22/INTERNAL_RELEASE_HANDOFF.md)) have all succeeded with reproducible evidence.
 3. **Live External Pilot Requires Live Infrastructure**: Distributing partner credentials for a public gateway (`https://gateway.staging.shlita.xyz`) cannot proceed until `gateway.staging.shlita.xyz` resolves to an active, TLS-secured host. Attempting partner onboarding prior to resolving `BLOCKER-HOST-01` and `BLOCKER-DNS-01` would result in connection errors.
 4. **Internal Testing (Tier A)** remains **GO**: Developers can continue testing locally and executing end-to-end flows with mock providers and deterministic fixtures.
