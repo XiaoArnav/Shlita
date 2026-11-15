@@ -10,8 +10,9 @@
 **Date:** 2026-11-15  
 **Target Staging URL:** `https://gateway.staging.shlita.xyz`  
 **Target Container Image:** `ghcr.io/xiaoarnav/shlita:18989b421779f567aca026e2224fbcc0961a99af` (`ghcr.io/xiaoarnav/shlita:staging`)  
-**Deployed Image Digest:** `ghcr.io/xiaoarnav/shlita@sha256:b760cdfc68fb61c229ccaeb1d48a022e7ab013edc7a2f9b2831f45b3d571ef38`  
-**Staging Deployment ID:** `7803808558`
+**Published Image Digest (GHCR):** `ghcr.io/xiaoarnav/shlita@sha256:b760cdfc68fb61c229ccaeb1d48a022e7ab013edc7a2f9b2831f45b3d571ef38`
+**Host-Observed Image Digest:** None (`BLOCKED` — Cloud VM host unprovisioned; pending live deployment)
+**GitHub Deployment Record:** `#7803808558` (Environment: `staging` — records GHCR publication, not live host execution)
 
 ---
 
@@ -31,6 +32,38 @@ Step 12 establishes the complete architecture, container infrastructure, locked 
 - **Live Acceptance Check Automation:** **PASS** (Verified asynchronous execution in `tests/step-12/live.acceptance.test.ts` and `scripts/verify-live-staging.sh`)
 - **Ledger Persistence Across Restart:** **PASS** (Verified with durable SQLite database file)
 - **Live Cloud VM & Public DNS/TLS (4 Acceptance Checks):** **BLOCKED** (Requires maintainer cloud hosting credentials, public DNS delegation, and staging secrets)
+
+### 1.1 Evidence Reconciliation: What Each Record Actually Proves
+
+A rigorous analysis of repository records separates CI artifact publication from live infrastructure execution:
+
+1. **GitHub Actions CI Run #43716806312 (Commit `18989b4`):**
+   - **What it proves:**
+     - Vitest test suite passes completely (128/128 tests across 20 files).
+     - Dashboard Playwright Chromium headless E2E flow passes (login, enrollment, live telemetry, freeze persistence, logout).
+     - SDK external consumer test passes from an isolated project outside the repository.
+     - Production security fails closed inside the built container when secrets are omitted.
+     - Compose backup worker isolation drill passes (unique project namespace, non-root user, volume survival across failure/success, SQLite restore).
+     - Multi-architecture container image was built and successfully pushed to GHCR (`ghcr.io/xiaoarnav/shlita:staging` and `ghcr.io/xiaoarnav/shlita:18989b421779f567aca026e2224fbcc0961a99af`).
+   - **What it does NOT prove:**
+     - Does NOT prove that a live staging server is running or reachable over the internet.
+
+2. **GitHub Deployment Record #7803808558 (Environment: `staging`):**
+   - **What it proves:**
+     - The GitHub environment `staging` received an automated deployment event triggered by the GHCR publication step in `.github/workflows/deploy.yml`.
+   - **What it does NOT prove:**
+     - Does NOT prove that a cloud VM host exists or that containers are running. As documented in `.github/workflows/deploy.yml`: *"Staging gateway runs via Docker Compose on a persistent cloud host. Image publication to GHCR is automated here; live HTTPS deployment requires host provisioning."*
+
+3. **Published Image Digest (`sha256:b760cdfc68fb61c229ccaeb1d48a022e7ab013edc7a2f9b2831f45b3d571ef38`):**
+   - **What it proves:**
+     - The container manifest is stored immutably in GHCR and ready to pull.
+   - **What it does NOT prove:**
+     - It is NOT a host-observed digest. A host-observed digest can only be captured once `docker inspect` is executed on an active Linux staging host.
+
+4. **External Public HTTPS & DNS Probe (`curl -Iv https://gateway.staging.shlita.xyz/ready`):**
+   - **What it proves:**
+     - Domain `gateway.staging.shlita.xyz` returns `NXDOMAIN` (no DNS record).
+     - Proves objectively that no live staging gateway is currently operational.
 
 ---
 
@@ -277,7 +310,7 @@ Hold Step 13 until cloud VM, DNS record, and staging secrets are supplied.
    - **Target URL:** `https://gateway.staging.shlita.xyz/ready`
    - **Tested Command:** `curl -Iv https://gateway.staging.shlita.xyz/ready`
    - **DNS Verification:** `nslookup gateway.staging.shlita.xyz 8.8.8.8`
-   - **Timestamp:** `2026-11-15T12:57:51Z` (Local: `2026-11-15T18:27:51+05:30`)
+   - **Timestamp:** `2026-11-15T13:03:54Z` (Local: `2026-11-15T18:33:54+05:30`)
    - **Result:** ⚠️ **BLOCKED** (`NXDOMAIN` — Could not resolve host `gateway.staging.shlita.xyz`).
    - **Missing Inputs:** `BLOCKER-DNS-01` (DNS A/AAAA record missing) and `BLOCKER-HOST-01` (Cloud VM unprovisioned).
 
