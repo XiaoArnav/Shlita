@@ -188,7 +188,7 @@ export async function runGeminiAgent({
     shlita: {
       outcome: proxyResult.outcome, // 'committed' | 'rejected' | 'conflict' | 'uncertain'
       operationId: proxyResult.operationId || null,
-      reason: proxyResult.outcome === 'rejected' ? proxyResult.reason : null,
+      reason: proxyResult.outcome === 'rejected' ? (proxyResult.reason || proxyResult.error || null) : null,
       reservedAmountMicroUsdc: proxyResult.cost?.reservedAmountMicroUsdc || null,
       fundsMoved: proxyResult.fundsMoved || false,
       provider: 'api.helius.xyz',
