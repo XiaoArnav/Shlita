@@ -1,18 +1,18 @@
 # Shlita — Step 9: Pilot Runbook
 
-**Purpose:** Step-by-step operational guide for launching and managing a controlled Shlita pilot with external developer partners.
+**Purpose:** Operational guide for launching, configuring, and managing a controlled Shlita pilot with external developer partners.
 
 ---
 
 ## Pre-Pilot Checklist
 
-- [ ] All 98 tests pass on the deployment commit
-- [ ] Container image tagged and pushed to GHCR
+- [ ] All automated tests pass (24 test suites, 145+ tests across core, gateway, SDK, browser, and rehearsal tests)
+- [ ] Container image tagged and pushed to GHCR (`ghcr.io/xiaoarnav/shlita-gateway:staging`)
 - [ ] VM provisioned with persistent storage
 - [ ] TLS certificate active (Caddy auto-renewal)
-- [ ] Environment variables set (see `.env.example`)
-- [ ] Backup schedule configured
-- [ ] Log forwarding active
+- [ ] Environment variables configured (see section 2.1)
+- [ ] Backup schedule and volume verified
+- [ ] Log forwarding active without credential leakage
 - [ ] Alert webhooks verified
 - [ ] Pilot partner list finalized (max 3 organizations)
 - [ ] Emergency contacts documented
@@ -29,7 +29,7 @@
 # 1.2 Pull the verified container image
 docker pull ghcr.io/xiaoarnav/shlita-gateway:staging
 
-# 1.3 Create persistent data directory
+# 1.3 Create persistent data directories
 sudo mkdir -p /var/lib/shlita/data
 sudo mkdir -p /var/lib/shlita/backups
 sudo chown -R 1000:1000 /var/lib/shlita
@@ -40,15 +40,18 @@ sudo chown -R 1000:1000 /var/lib/shlita
 ## 2. Gateway Deployment
 
 ```bash
-# 2.1 Create environment file
+# 2.1 Create environment configuration
 cat > /opt/shlita/.env <<'EOF'
 NODE_ENV=production
-SHLITA_PORT=4000
-SHLITA_DATA_DIR=/var/lib/shlita/data
-SHLITA_OPERATOR_KEY=<generated-operator-key>
+SHLITA_ENV=production
+PORT=4000
+SHLITA_DB_PATH=/var/lib/shlita/data/ledger.db
+SHLITA_STATE_DIR=/var/lib/shlita/data
+SHLITA_BACKUP_DIR=/var/lib/shlita/backups
+SHLITA_OPERATOR_KEY=<generated-operator-key-at-least-32-chars>
 SHLITA_OPERATOR_ORG=org_pilot_alpha
-SHLITA_SIMULATION=false
-# Add provider credentials for upstream services:
+SHLITA_ALLOW_SIMULATION=false
+# Provider credentials:
 # HELIUS_API_KEY=<key>
 # TAVILY_API_KEY=<key>
 EOF
@@ -93,23 +96,22 @@ curl -s -I https://gateway.pilot.shlita.xyz/ready
 ## 4. Partner Onboarding
 
 ```bash
-# 4.1 Enroll pilot partner organization
-# (via operator session or direct API call)
+# 4.1 Enroll pilot partner agent via operator API
 curl -X POST https://gateway.pilot.shlita.xyz/v1/agents \
   -H "x-shlita-operator-key: $OPERATOR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "label": "partner-alpha-agent-1",
-    "budgetMicroUsdc": 100000,
-    "perCallLimitMicroUsdc": 25000,
-    "vendors": ["api.openai.com", "api.anthropic.com"]
+    "agentId": "partner-alpha-agent-1",
+    "periodBudgetMicroUsdc": "100000",
+    "maxPerCallMicroUsdc": "25000",
+    "allowedVendors": ["api.helius.xyz", "api.openai.com"]
   }'
-# Response includes the agent API key (shown ONCE)
+# Response returns {"agentId":"partner-alpha-agent-1","apiKey":"shlt_live_...","credentialStatus":"issued"}
 
-# 4.2 Distribute to partner
-# - Agent API key (secure channel only)
-# - SDK installation: npm install <tarball-url>
-# - Quickstart guide: docs/sdk/quickstart.md
+# 4.2 Distribute to partner:
+# - Agent API key (secure channel only; never sent in plaintext emails)
+# - Scoped gateway URL: https://gateway.pilot.shlita.xyz
+# - Packaged SDK archive or installation instructions: docs/sdk/quickstart.md
 ```
 
 ---
@@ -140,7 +142,7 @@ docker logs -f shlita-gateway --since 1h | jq .
 
 ### 6.1 Backup (Run Daily)
 ```bash
-# Online hot backup (does not stop the server)
+# Online hot backup using SQLite WAL backup API (does not stop server)
 docker exec shlita-gateway node dist/backup-cli.js
 # Output: {"event":"backup","integrity":"ok"}
 
@@ -148,7 +150,7 @@ docker exec shlita-gateway node dist/backup-cli.js
 cp /var/lib/shlita/backups/latest.db /backup/shlita-$(date +%Y%m%d).db
 ```
 
-### 6.2 Budget Review
+### 6.2 Spend & Ledger Review
 ```bash
 # Check aggregate spend across all pilot agents
 curl -s https://gateway.pilot.shlita.xyz/v1/operations \
@@ -157,10 +159,12 @@ curl -s https://gateway.pilot.shlita.xyz/v1/operations \
 
 ### 6.3 Freeze Agent (Emergency)
 ```bash
-# Immediately halt all spending for a specific agent
+# Immediately halt all spending for a specific agent:
 curl -X POST https://gateway.pilot.shlita.xyz/v1/agents/<agent-id>/freeze \
   -H "x-shlita-operator-key: $OPERATOR_KEY" \
-  -H "x-shlita-csrf: $CSRF_TOKEN"
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Emergency freeze"}'
+# (Note: x-shlita-csrf is only required for browser cookie session auth, not operator key header auth)
 ```
 
 ---
@@ -171,9 +175,9 @@ curl -X POST https://gateway.pilot.shlita.xyz/v1/agents/<agent-id>/freeze \
 |---|---|---|
 | **SEV-1** | Overspend detected | Freeze all agents → backup database → investigate ledger |
 | **SEV-1** | Gateway unreachable | Check VM, Docker status, disk space |
-| **SEV-2** | Circuit breaker trips | Review agent behavior → reset if false positive |
-| **SEV-2** | Database lock timeout | Verify single-instance (no duplicate containers) |
-| **SEV-3** | Partner reports SDK error | Check agent enrollment, API key validity, policy config |
+| **SEV-2** | Circuit breaker trips | Review agent behavior → reset circuit if false positive |
+| **SEV-2** | Database lock timeout | Verify single-instance deployment (no duplicate writers) |
+| **SEV-3** | Partner reports SDK error | Check agent enrollment, API key validity, policy allowlist |
 
 **Full incident response playbook:** `docs/step-8/INCIDENT_RESPONSE.md`
 
@@ -201,8 +205,6 @@ The pilot is considered successful when:
 docker exec shlita-gateway node dist/backup-cli.js
 
 # 9.3 Freeze all agents (prevent new operations)
-# (via operator dashboard or API)
-
 # 9.4 Wait for in-flight operations to complete (30 seconds)
 sleep 30
 
@@ -219,9 +221,20 @@ tar czf shlita-pilot-archive-$(date +%Y%m%d).tar.gz /var/lib/shlita/
 
 If a critical issue is discovered during the pilot:
 
-1. **Freeze all agents** immediately via operator API
-2. **Create emergency backup** of the current database
-3. **Stop the gateway** container
-4. **Restore from known-good backup** using `restore-cli.ts`
-5. **Restart the gateway** and verify `/ready` returns 200
-6. **Notify partners** of the incident and expected resolution
+1. **Freeze all agents** immediately via operator API or dashboard.
+2. **Create emergency backup** of the current database.
+3. **Stop the gateway** container (`docker compose stop gateway`).
+4. **Restore from known-good backup** using restore CLI:
+   ```bash
+   node dist/restore-cli.js /var/lib/shlita/backups/latest.db /var/lib/shlita/data/ledger.db
+   ```
+5. **Restart the gateway** and verify `/ready` returns HTTP 200.
+6. **Notify partners** of the incident and resolution.
+
+---
+
+## 11. Staging & Pilot Status
+
+- **Step 16 Local Rehearsal**: Verified. Packaged SDK, external install, all 6 developer/operator scenarios pass with persistent SQLite storage and zero secret leaks.
+- **Step 12 Hosted Staging**: Tracked in PR #19 pending approval of an accessible Linux host (`gateway.staging.shlita.xyz`).
+- **Step 15 Live Gemini Smoke Test**: Verified deterministically; live smoke test is tracked separately pending external `GEMINI_API_KEY`.
