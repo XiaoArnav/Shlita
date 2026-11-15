@@ -3,14 +3,15 @@
 **Document Reference:** `docs/step-12/STAGING_VERIFICATION.md`  
 **Parent Milestone:** Step 12 — Persistent HTTPS Staging Deployment  
 **Upstream Target:** `XiaoArnav/Shlita:main`  
-**Base Commit (PR #18 Merged):** `bc7f2d2f8563d1d15329038d68ce872c48f454d0` (PR #18 merged to `main`)
-**Baseline CI Run:** [Run #43473751606](https://github.com/XiaoArnav/Shlita/actions/runs/43473751606)
-**Maintainer Author:** `Arnav Patel (@XiaoArnav)`
-**Date:** 2026-11-15
-**Target Staging URL:** `https://gateway.staging.shlita.xyz`
-**Target Container Image:** `ghcr.io/xiaoarnav/shlita:bc7f2d2f8563d1d15329038d68ce872c48f454d0` (`ghcr.io/xiaoarnav/shlita:staging`)
-**Deployed Image Digest:** `ghcr.io/xiaoarnav/shlita@sha256:657bf0607b85d484dee3eeab0bf30cffe939a43c171c64df3d28b9df9cbed637`
-**Staging Deployment ID:** `7772013328`
+**Final Commit:** `18989b421779f567aca026e2224fbcc0961a99af` (`main`)  
+**Base Commit (PR #18 Merged):** `bc7f2d2f8563d1d15329038d68ce872c48f454d0` (PR #18 merged to `main`)  
+**Baseline CI Run:** [Run #43716806312](https://github.com/XiaoArnav/Shlita/actions/runs/43716806312)  
+**Maintainer Author:** `Arnav Patel (@XiaoArnav)`  
+**Date:** 2026-11-15  
+**Target Staging URL:** `https://gateway.staging.shlita.xyz`  
+**Target Container Image:** `ghcr.io/xiaoarnav/shlita:18989b421779f567aca026e2224fbcc0961a99af` (`ghcr.io/xiaoarnav/shlita:staging`)  
+**Deployed Image Digest:** `ghcr.io/xiaoarnav/shlita@sha256:b760cdfc68fb61c229ccaeb1d48a022e7ab013edc7a2f9b2831f45b3d571ef38`  
+**Staging Deployment ID:** `7803808558`
 
 ---
 
@@ -235,9 +236,9 @@ Per the maintainer specification, Step 12 live staging remains marked as **BLOCK
 ============================================================
  Shlita Step 12: Live Staging Acceptance Checks
  Target: https://gateway.staging.shlita.xyz (Host: gateway.staging.shlita.xyz)
- Timestamp: 2026-11-15T12:57:51Z
- Deployed Commit: bc7f2d2f8563d1d15329038d68ce872c48f454d0
- Published Image Digest: sha256:657bf0607b85d484dee3eeab0bf30cffe939a43c171c64df3d28b9df9cbed637
+ Timestamp: 2026-11-15T13:03:54Z
+ Deployed Commit: 18989b421779f567aca026e2224fbcc0961a99af
+ Published Image Digest: sha256:b760cdfc68fb61c229ccaeb1d48a022e7ab013edc7a2f9b2831f45b3d571ef38
 ============================================================
 
 [LIVE-HTTPS-01] Checking public HTTPS reachability and TLS certificate...
@@ -337,6 +338,6 @@ docker compose -f compose.staging.yaml up -d
 If a newly deployed image exhibits anomalies or fails health checks:
 ```bash
 # Roll back to the previous known-good image digest/tag:
-./scripts/rollback.sh ghcr.io/xiaoarnav/shlita:bc7f2d2f8563d1d15329038d68ce872c48f454d0
+./scripts/rollback.sh ghcr.io/xiaoarnav/shlita:18989b421779f567aca026e2224fbcc0961a99af
 ```
 The rollback script verifies the target image, performs a graceful stop of the gateway container, starts the target image against the existing persistent volume `shlita-staging-data`, and waits for `/ready` to return 200. Zero ledger records are dropped.
