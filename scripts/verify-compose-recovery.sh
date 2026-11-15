@@ -32,12 +32,24 @@ CANARY_VOLUMES=()
 
 cleanup() {
   echo "Executing scoped cleanup handler..."
-  for proj in "${DISPOSABLE_PROJECTS[@]:-}"; do
-    if [ -n "$proj" ]; then
-      echo "Tearing down disposable test stack: $proj..."
-      docker compose -p "$proj" -f compose.staging.yaml down -v --remove-orphans >/dev/null 2>&1 || true
-    fi
-  done
+  if [ -n "${SRC_PROJECT:-}" ]; then
+    SHLITA_DATA_VOLUME="${SRC_PROJECT}-data" \
+    SHLITA_BACKUPS_VOLUME="${SRC_PROJECT}-backups" \
+    SHLITA_CADDY_DATA_VOLUME="${SRC_PROJECT}-caddy-data" \
+    SHLITA_CADDY_CONFIG_VOLUME="${SRC_PROJECT}-caddy-config" \
+    SHLITA_NETWORK="${SRC_PROJECT}-net" \
+    docker compose -p "$SRC_PROJECT" -f compose.staging.yaml down -v --remove-orphans >/dev/null 2>&1 || true
+    docker volume rm -f "${SRC_PROJECT}-data" "${SRC_PROJECT}-backups" >/dev/null 2>&1 || true
+  fi
+  if [ -n "${REC_PROJECT:-}" ]; then
+    SHLITA_DATA_VOLUME="${REC_DATA_VOLUME:-${REC_PROJECT}-data}" \
+    SHLITA_BACKUPS_VOLUME="${REC_BACKUPS_VOLUME:-${REC_PROJECT}-backups}" \
+    SHLITA_CADDY_DATA_VOLUME="${REC_PROJECT}-caddy-data" \
+    SHLITA_CADDY_CONFIG_VOLUME="${REC_PROJECT}-caddy-config" \
+    SHLITA_NETWORK="${REC_PROJECT}-net" \
+    docker compose -p "$REC_PROJECT" -f compose.staging.yaml down -v --remove-orphans >/dev/null 2>&1 || true
+    docker volume rm -f "${REC_DATA_VOLUME:-${REC_PROJECT}-data}" "${REC_BACKUPS_VOLUME:-${REC_PROJECT}-backups}" >/dev/null 2>&1 || true
+  fi
   for c_vol in "${CANARY_VOLUMES[@]:-}"; do
     if [ -n "$c_vol" ]; then
       docker volume rm -f "$c_vol" >/dev/null 2>&1 || true
@@ -441,8 +453,22 @@ echo "CHECK 5 PASS: Source database and backup snapshot preserved untouched."
 # Phase 6: Scoped Cleanup
 # ============================================================
 echo "Tearing down source and recovery Compose stacks..."
+SHLITA_DATA_VOLUME="${SRC_PROJECT}-data" \
+SHLITA_BACKUPS_VOLUME="${SRC_PROJECT}-backups" \
+SHLITA_CADDY_DATA_VOLUME="${SRC_PROJECT}-caddy-data" \
+SHLITA_CADDY_CONFIG_VOLUME="${SRC_PROJECT}-caddy-config" \
+SHLITA_NETWORK="${SRC_PROJECT}-net" \
 docker compose -p "$SRC_PROJECT" -f compose.staging.yaml down -v --remove-orphans >/dev/null 2>&1 || true
+
+SHLITA_DATA_VOLUME="$REC_DATA_VOLUME" \
+SHLITA_BACKUPS_VOLUME="$REC_BACKUPS_VOLUME" \
+SHLITA_CADDY_DATA_VOLUME="${REC_PROJECT}-caddy-data" \
+SHLITA_CADDY_CONFIG_VOLUME="${REC_PROJECT}-caddy-config" \
+SHLITA_NETWORK="${REC_PROJECT}-net" \
 docker compose -p "$REC_PROJECT" -f compose.staging.yaml down -v --remove-orphans >/dev/null 2>&1 || true
+
+# Explicitly prune any remaining disposable project volumes (e.g. manually created recovery volumes)
+docker volume rm -f "${SRC_PROJECT}-data" "${SRC_PROJECT}-backups" "${REC_DATA_VOLUME}" "${REC_BACKUPS_VOLUME}" >/dev/null 2>&1 || true
 
 assert_canaries_intact "after recovery drill teardown"
 
